@@ -16,9 +16,14 @@ export async function POST(request: Request) {
   try {
     const status = await readWhatsAppWorkerStatus()
     const workerOnline = Boolean(status.workerOnline)
+    const isConnected = Boolean(status.workerOnline && status.ready && status.authenticated && status.status === "connected")
 
     if (!workerOnline) {
       return NextResponse.json({ error: "عامل واتساب غير متصل حالياً" }, { status: 409 })
+    }
+
+    if (!isConnected) {
+      return NextResponse.json({ error: "لا توجد جلسة واتساب متصلة ليتم إلغاء ربطها حالياً" }, { status: 409 })
     }
 
     const supabase = createAdminClient()

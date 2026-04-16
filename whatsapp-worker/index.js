@@ -190,6 +190,7 @@ let hasWorkerLock = false
 let sentMessagesSincePause = 0
 let isSyncingIncomingMessages = false
 let isPersistingSharedState = false
+let consecutiveConnectionCheckFailures = 0
 let startupWatchdog = null
 let workerState = {
   status: "starting",
@@ -837,6 +838,20 @@ function shouldForceFreshQrFromReason(reason) {
   return normalizedReason.includes("UNKNOWN")
 }
 
+function hasStartupGraceExpired(graceMs = 60000) {
+  const startedAtTime = workerState.startedAt ? new Date(workerState.startedAt).getTime() : 0
+  if (!Number.isFinite(startedAtTime) || !startedAtTime) {
+    return true
+  }
+
+  return Date.now() - startedAtTime > graceMs
+}
+
+function isRecoverableConnectionError(error) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Attempted to use detached Frame|Execution context was destroyed|Cannot find context with specified id|Target closed/i.test(message)
+}
+
 async function verifyWhatsAppConnection() {
   if (isResettingSession || typeof whatsappClient.getState !== "function") {
     return
@@ -844,6 +859,7 @@ async function verifyWhatsAppConnection() {
 
   try {
     const clientState = await whatsappClient.getState()
+    consecutiveConnectionCheckFailures = 0
     const normalizedState = String(clientState || "unknown").trim().toUpperCase()
 
     if (isClientConnectedState(normalizedState)) {
@@ -911,6 +927,17 @@ async function verifyWhatsAppConnection() {
       lastError: normalizedState === "OPENING" || normalizedState === "PAIRING" ? null : `WhatsApp state changed to ${normalizedState}`,
     })
 
+    const shouldWaitForInitialQr = Boolean(
+      normalizedState === "UNKNOWN" &&
+      !workerState.authenticated &&
+      !hasPendingQrSession() &&
+      !hasStartupGraceExpired()
+    )
+
+    if (shouldWaitForInitialQr) {
+      return
+    }
+
     if ((normalizedState === "UNKNOWN" || normalizedState === "DISCONNECTED") && !isResettingSession) {
       void resetWhatsAppSession({
         clearSession: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession(),
@@ -919,6 +946,29 @@ async function verifyWhatsAppConnection() {
       })
     }
   } catch (error) {
+    if (isRecoverableConnectionError(error)) {
+      consecutiveConnectionCheckFailures += 1
+      const hasPendingQr = hasPendingQrSession()
+      const errorMessage = error instanceof Error ? error.message : String(error)
+
+      persistWorkerState({
+        status: hasPendingQr ? "waiting_for_qr" : "reconnecting",
+        ready: false,
+        authenticated: false,
+        qrAvailable: hasPendingQr,
+        qrValue: workerState.qrValue,
+        disconnectedAt: new Date().toISOString(),
+        lastError: errorMessage,
+      })
+
+      if (!hasPendingQr && consecutiveConnectionCheckFailures >= 3 && !isResettingSession) {
+        void resetWhatsAppSession({ clearSession: false, status: "reconnecting", reason: "recoverable_connection_error" })
+      }
+
+      log(`Recoverable WhatsApp connection check failure (${consecutiveConnectionCheckFailures}).`, error)
+      return
+    }
+
     log("Failed to verify live WhatsApp connection state.", error)
   }
 }

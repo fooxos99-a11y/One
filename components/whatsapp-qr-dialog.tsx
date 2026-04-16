@@ -246,24 +246,6 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
   const handleRefreshQr = async () => {
     try {
       setIsRefreshingQr(true)
-      const response = await fetch("/api/whatsapp/disconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      })
-
-      const data = await response.json().catch(() => null)
-      if (!response.ok) {
-        throw new Error(data?.error || "تعذر تحديث الباركود")
-      }
-
-      setStatus((current) => ({
-        ...current,
-        status: "fetching_qr",
-        ready: false,
-        authenticated: false,
-        qrAvailable: false,
-        qrImageUrl: null,
-      }))
       setImageFailed(false)
       await fetchStatus({ silent: true })
     } catch (error) {

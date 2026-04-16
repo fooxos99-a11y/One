@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -82,7 +82,7 @@ function getStatusUi(status: WhatsAppStatusResponse) {
     return {
       label: "عامل واتساب غير متصل",
       tone: "bg-rose-50 text-rose-700 border-rose-200",
-      description: "العامل المسؤول عن واتساب غير متصل حالياً، لذلك لن يظهر باركود جديد حتى يعود للعمل.",
+      description: "العامل المسؤول عن واتساب غير متصل حاليا لذلك لن يظهر باركود جديد حتى يعود للعمل.",
     }
   }
 
@@ -103,28 +103,28 @@ function getStatusUi(status: WhatsAppStatusResponse) {
       return {
         label: "فشل الربط",
         tone: "bg-rose-50 text-rose-700 border-rose-200",
-        description: "فشل التحقق من الجلسة، وقد تحتاج إلى مسح باركود جديد.",
+        description: "فشل التحقق من الجلسة وقد تحتاج إلى مسح باركود جديد.",
       }
     case "disconnected":
       if (!status.authenticated) {
         return {
           label: "بانتظار الباركود",
           tone: "bg-slate-100 text-slate-700 border-slate-200",
-          description: "يجري تجهيز باركود جديد أو تحديث الجلسة. انتظر قليلًا أو حدّث الباركود يدويًا.",
+          description: "يجري تجهيز باركود جديد أو تحديث الجلسة. انتظر قليلا أو حدث الباركود يدويا.",
         }
       }
 
       return {
         label: "انقطع الاتصال",
         tone: "bg-orange-50 text-orange-700 border-orange-200",
-        description: "الجلسة انقطعت. انتظر باركودًا جديدًا أو أعد الربط.",
+        description: "الجلسة انقطعت. انتظر باركودا جديدا أو أعد الربط.",
       }
     case "starting":
       if (!status.authenticated && !status.qrAvailable) {
         return {
           label: "لم يتم الربط",
           tone: "bg-slate-100 text-slate-700 border-slate-200",
-          description: "يتم تجهيز الجلسة الآن، وسيظهر الباركود عند جاهزيته. إذا استمرت هذه الحالة فحدّث الباركود.",
+          description: "يتم تجهيز الجلسة الآن وسيظهر الباركود عند جاهزيته. إذا استمرت هذه الحالة فحدث الباركود.",
         }
       }
 
@@ -134,11 +134,6 @@ function getStatusUi(status: WhatsAppStatusResponse) {
         description: "عامل واتساب بدأ التشغيل ويجهز الجلسة.",
       }
     case "disconnecting":
-      return {
-        label: "جاري جلب الباركود",
-        tone: "bg-slate-100 text-slate-700 border-slate-200",
-        description: "يتم إنهاء الجلسة الحالية وتجهيز باركود جديد.",
-      }
     case "fetching_qr":
       return {
         label: "جاري جلب الباركود",
@@ -178,9 +173,10 @@ export default function WhatsAppQrPage() {
   const [imageFailed, setImageFailed] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isRefreshingQr, setIsRefreshingQr] = useState(false)
+
   const statusUi = getStatusUi(status)
   const isConnected = status.ready && status.authenticated && status.status === "connected"
-  const canDisconnect = status.ready && status.authenticated && status.status === "connected" && !isDisconnecting
+  const canDisconnect = isConnected && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed)
   const qrImageSrc = status.qrImageUrl
 
@@ -256,32 +252,10 @@ export default function WhatsAppQrPage() {
   const handleRefreshQr = async () => {
     try {
       setIsRefreshingQr(true)
-
-      const response = await fetch("/api/whatsapp/disconnect", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      const data = await response.json().catch(() => null)
-      if (!response.ok) {
-        throw new Error(data?.error || "تعذر تحديث الباركود")
-      }
-
-      setStatus((current) => ({
-        ...current,
-        status: "fetching_qr",
-        ready: false,
-        authenticated: false,
-        qrAvailable: false,
-        qrImageUrl: null,
-      }))
-
       setImageFailed(false)
       await fetchStatus({ silent: true })
     } catch (error) {
-      await alertDialog(error instanceof Error ? error.message : "تعذر تحديث الباركود حالياً", "خطأ")
+      await alertDialog(error instanceof Error ? error.message : "تعذر تحديث الباركود حاليا", "خطأ")
     } finally {
       setIsRefreshingQr(false)
     }
@@ -290,7 +264,7 @@ export default function WhatsAppQrPage() {
   const handleDisconnect = async () => {
     const confirmed = await confirmDialog({
       title: "إلغاء ربط واتساب",
-      description: "سيتم فصل الجوال الحالي وإنشاء باركود جديد لتتمكن من ربط جوال آخر. هل تريد المتابعة؟",
+      description: "سيتم فصل الجوال الحالي وإنشاء باركود جديد لتتمكن من ربط جوال آخر. هل تريد المتابعة",
       confirmText: "إلغاء الربط",
       cancelText: "تراجع",
     })
@@ -326,7 +300,7 @@ export default function WhatsAppQrPage() {
       await alertDialog("تم إرسال طلب إلغاء الربط. سيظهر باركود جديد بعد لحظات لربط جوال آخر.", "تم")
       await fetchStatus()
     } catch (error) {
-      await alertDialog(error instanceof Error ? error.message : "تعذر إلغاء الربط حالياً", "خطأ")
+      await alertDialog(error instanceof Error ? error.message : "تعذر إلغاء الربط حاليا", "خطأ")
     } finally {
       setIsDisconnecting(false)
     }
@@ -401,7 +375,7 @@ export default function WhatsAppQrPage() {
                       />
                     </div>
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-right text-sm font-bold text-amber-800">
-                      افتح واتساب في الجوال ثم الأجهزة المرتبطة، وبعدها امسح هذا الباركود لإكمال الربط.
+                      افتح واتساب في الجوال ثم الأجهزة المرتبطة وبعدها امسح هذا الباركود لإكمال الربط.
                     </div>
                   </div>
                 ) : (
@@ -416,7 +390,42 @@ export default function WhatsAppQrPage() {
               </CardContent>
             </Card>
 
-            <div className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+              <Card className="rounded-[30px] border border-[#d8e0f0] bg-white shadow-[0_18px_70px_rgba(40,64,130,0.08)]">
+                <CardHeader className="text-right">
+                  <CardTitle className="text-lg font-black text-[#1a2332]">تفاصيل الحالة</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-2">
+                  <div className={`rounded-2xl border px-4 py-4 text-right ${statusUi.tone}`}>
+                    <p className="text-xs font-black uppercase tracking-[0.18em]">الحالة الحالية</p>
+                    <p className="mt-2 text-lg font-black">{statusUi.label}</p>
+                    <p className="mt-2 text-sm font-bold leading-6">{statusUi.description}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#e5edf8] bg-[#f8fbff] px-4 py-4 text-right text-sm font-medium text-slate-600">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#3453a7]">آخر تحديث</p>
+                    <p className="mt-2 text-base font-black text-[#1a2332]">{formatDateTime(status.lastUpdatedAt)}</p>
+                    <p className="mt-3 text-xs font-bold text-slate-500">آخر نبضة: {formatDateTime(status.lastHeartbeatAt)}</p>
+                    <p className="mt-2 text-xs font-bold text-slate-500">آخر تحديث للباركود: {formatDateTime(status.qrUpdatedAt)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#e5edf8] bg-white px-4 py-4 text-right text-sm font-medium text-slate-600">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#3453a7]">بيانات الاتصال</p>
+                    <ul className="mt-3 space-y-2 font-bold">
+                      <li>العامل متصل: {status.workerOnline ? "نعم" : "لا"}</li>
+                      <li>الجلسة جاهزة: {status.ready ? "نعم" : "لا"}</li>
+                      <li>الجلسة موثقة: {status.authenticated ? "نعم" : "لا"}</li>
+                      <li>الباركود متاح: {status.qrAvailable ? "نعم" : "لا"}</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-2xl border border-[#e5edf8] bg-white px-4 py-4 text-right text-sm font-medium text-slate-600">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#3453a7]">سجل الحالة</p>
+                    <p className="mt-3 font-bold">آخر اتصال: {formatDateTime(status.connectedAt)}</p>
+                    <p className="mt-2 font-bold">آخر انقطاع: {formatDateTime(status.disconnectedAt)}</p>
+                    <p className="mt-2 font-bold">آخر فشل توثيق: {formatDateTime(status.authFailedAt)}</p>
+                    <p className="mt-3 rounded-2xl bg-[#f8fbff] px-3 py-3 text-xs leading-6 text-slate-500">{status.lastError || "لا توجد أخطاء مسجلة حاليا."}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="rounded-[30px] border border-[#d8e0f0] bg-white shadow-[0_18px_70px_rgba(40,64,130,0.08)]">
                 <CardHeader className="text-right">
                   <CardTitle className="text-lg font-black text-[#1a2332]">تنبيهات مهمة</CardTitle>
@@ -428,7 +437,7 @@ export default function WhatsAppQrPage() {
                   </div>
                   <div className="flex items-start gap-3 rounded-2xl border border-[#e5edf8] bg-[#f8fbff] px-4 py-3">
                     <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#3453a7]" />
-                    <p>إبقاء الهاتف متصلًا بالإنترنت يقلل احتمالات انقطاع الجلسة وفقدان الربط.</p>
+                    <p>إبقاء الهاتف متصلا بالإنترنت يقلل احتمالات انقطاع الجلسة وفقدان الربط.</p>
                   </div>
                 </CardContent>
               </Card>
