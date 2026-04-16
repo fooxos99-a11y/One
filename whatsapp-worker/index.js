@@ -724,6 +724,16 @@ function hasPendingQrSession() {
   return Boolean((fs.existsSync(QR_IMAGE_PATH) || workerState.qrValue || hasRecentQrState()) && !workerState.authenticated)
 }
 
+function shouldForceFreshQrFromState(clientState) {
+  const normalizedState = String(clientState || "").trim().toUpperCase()
+  return normalizedState === "UNKNOWN"
+}
+
+function shouldForceFreshQrFromReason(reason) {
+  const normalizedReason = String(reason || "").trim().toUpperCase()
+  return normalizedReason.includes("UNKNOWN")
+}
+
 async function verifyWhatsAppConnection() {
   if (isResettingSession || typeof whatsappClient.getState !== "function") {
     return
@@ -799,7 +809,10 @@ async function verifyWhatsAppConnection() {
     })
 
     if ((normalizedState === "UNKNOWN" || normalizedState === "DISCONNECTED") && !isResettingSession) {
-      void resetWhatsAppSession({ clearSession: false, status: "reconnecting" })
+      void resetWhatsAppSession({
+        clearSession: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession(),
+        status: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession() ? "fetching_qr" : "reconnecting",
+      })
     }
   } catch (error) {
     log("Failed to verify live WhatsApp connection state.", error)
@@ -1323,7 +1336,11 @@ async function bootstrap() {
     })
 
     if (!isResettingSession) {
-      void resetWhatsAppSession({ clearSession: false, status: "reconnecting" })
+      const shouldForceFreshQr = shouldForceFreshQrFromReason(reason) && !hasPendingQrSession()
+      void resetWhatsAppSession({
+        clearSession: shouldForceFreshQr,
+        status: shouldForceFreshQr ? "fetching_qr" : "reconnecting",
+      })
     }
   })
 
