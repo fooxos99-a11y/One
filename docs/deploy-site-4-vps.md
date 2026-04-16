@@ -1,6 +1,8 @@
 # نشر الموقع الرابع على VPS واحد
 
-هذا الدليل يشغّل `site-4` فقط على VPS واحد، مع إبقاء عامل واتساب يعمل دائمًا عبر `pm2`.
+هذا الدليل يشغّل `site-4` على VPS مع إبقاء عامل واتساب يعمل دائمًا عبر `pm2`.
+
+إذا كان التطبيق نفسه مستضافًا على `Vercel`، فلا تحتاج إلى تشغيل `habib-site4-app` على الـ VPS. يكفي تشغيل `habib-site4-worker` فقط، بشرط أن يستخدم نفس مشروع `Supabase` ونفس `WHATSAPP_WORKER_STATE_SETTING_ID` و `WHATSAPP_WORKER_COMMAND_SETTING_ID` الموجودة في Vercel.
 
 ## بيانات الخادم
 
@@ -66,11 +68,11 @@ cd /var/www/habib/app
 
 ## 4. نقل ملف البيئة الخاص بالموقع الرابع
 
-هذا الملف جاهز محليًا هنا:
+الملف الفعلي `site.env` محلي فقط ومُهمل من git، لذلك ابدأ من القالب التالي:
 
-- `deploy/vps/sites/site-4/site.env`
+- `deploy/vps/sites/site-4/site.env.example`
 
-انسخه إلى نفس المسار داخل الخادم:
+ثم انسخه أو أعد تسميته على الخادم إلى:
 
 ```bash
 /var/www/habib/app/deploy/vps/sites/site-4/site.env
@@ -94,7 +96,7 @@ chmod +x ./scripts/vps/run-site.sh
 
 ## 6. تشغيل الموقع وعامل واتساب عبر PM2
 
-شغّل الموقع الرابع فقط:
+إذا كنت تشغّل التطبيق كاملًا على الـ VPS:
 
 ```bash
 cd /var/www/habib/app
@@ -104,13 +106,29 @@ pm2 save
 pm2 startup
 ```
 
+إذا كان التطبيق على `Vercel` وتريد فقط عامل واتساب على الـ VPS:
+
+```bash
+cd /var/www/habib/app
+pm2 start ./scripts/vps/run-site.sh --name habib-site4-worker --interpreter /bin/bash -- worker ./deploy/vps/sites/site-4/site.env
+pm2 save
+pm2 startup
+```
+
 تحقق من الحالة:
 
 ```bash
 pm2 status
-pm2 logs habib-site4-app
 pm2 logs habib-site4-worker
 ```
+
+إذا كان التطبيق على `Vercel`، افحص من الخارج بعد تشغيل العامل:
+
+```bash
+curl https://one-teal-xi.vercel.app/api/whatsapp/status
+```
+
+يجب أن تتغير قيمة `workerOnline` إلى `true` خلال ثوانٍ إذا كانت إعدادات `Supabase` ومعرّفات حالة العامل متطابقة بين Vercel والـ VPS.
 
 ## 7. إعداد Nginx
 
