@@ -52,6 +52,24 @@ pm2 start ./scripts/vps/run-site.sh --name habib-site2-worker --interpreter /bin
 pm2 save
 ```
 
+## أمر إنقاذ سريع للموقعين
+
+إذا تعطل الباركود في الموقعين أو توقف أحد الـ workers، شغّل هذا الأمر من داخل الخادم:
+
+```bash
+cd /var/www/habib/app
+bash ./scripts/vps/recover-whatsapp-sites.sh
+```
+
+هذا الأمر يقوم بـ:
+
+- تشغيل أو إعادة تشغيل `site-1-app`
+- تشغيل أو إعادة تشغيل `site-1-worker`
+- تشغيل أو إعادة تشغيل `site-2-app`
+- تشغيل أو إعادة تشغيل `site-2-worker`
+- طباعة `pm2 ls`
+- عرض آخر سجلات عمال واتساب للموقعين
+
 ## تفعيل nginx على نفس الـ IP
 
 ### site-1
