@@ -30,6 +30,12 @@ site4-deploy.tar.gz
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+/temp*.txt
+/tmp*.txt
+/*.diff
+/*_out.txt
+/ts_errors.log
+/tsc_*.log
 
 # local env files
 .env*.local
