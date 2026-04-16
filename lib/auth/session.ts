@@ -103,6 +103,10 @@ function getSessionSecret() {
   )
 }
 
+export function hasSessionSecretConfigured() {
+  return Boolean(getSessionSecret())
+}
+
 function toBase64Url(value: string | Buffer) {
   return Buffer.from(value).toString("base64url")
 }

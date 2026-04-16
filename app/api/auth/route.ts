@@ -4,6 +4,7 @@ import {
   createSignedSessionToken,
   getDevelopmentBootstrapAdminId,
   getClearedSessionCookieOptions,
+  hasSessionSecretConfigured,
   getSessionCookieOptions,
   getSessionFromCookieHeader,
   normalizeAppRole,
@@ -71,6 +72,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!hasSessionSecretConfigured()) {
+      console.error("[auth] Session secret is not configured for login")
+      return NextResponse.json({ error: "إعدادات تسجيل الدخول غير مكتملة على الخادم" }, { status: 500 })
+    }
+
     const { account_number } = await request.json()
 
     if (!account_number || typeof account_number !== "string" || !/^[0-9]+$/.test(account_number)) {
@@ -84,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     const bootstrapAdmin = getDevelopmentBootstrapAdmin(accountNum)
     if (bootstrapAdmin) {
-      return createAuthSuccessResponse(bootstrapAdmin)
+      return await createAuthSuccessResponse(bootstrapAdmin)
     }
 
     const supabase = createAdminClient()
@@ -106,7 +112,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "الدور الوظيفي لهذا الحساب غير مدعوم" }, { status: 403 })
       }
 
-      return createAuthSuccessResponse({
+      return await createAuthSuccessResponse({
         id: String(user.id),
         name: user.name,
         role: normalizedRole,
@@ -126,7 +132,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (student) {
-      return createAuthSuccessResponse({
+      return await createAuthSuccessResponse({
         id: String(student.id),
         name: student.name,
         role: "student",
