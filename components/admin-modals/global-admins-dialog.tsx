@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { UserPlus, Shield, PlusCircle, Trash2, Settings, Plus } from 'lucide-react'
+import { UserPlus, Shield, PlusCircle, Trash2, Settings, Plus, Edit2 } from 'lucide-react'
 import { useAdminAuth } from "@/hooks/use-admin-auth"
+import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
 
 interface UserEntry {
   id: string
@@ -42,6 +43,7 @@ export function GlobalAdminsDialog() {
   const [isAddMode, setIsAddMode] = useState(false)
   const [isAddRoleMode, setIsAddRoleMode] = useState(false)
   const [newRoleName, setNewRoleName] = useState("")
+  const [editingRoleName, setEditingRoleName] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newAdmin, setNewAdmin] = useState<NewAdminForm>({
     name: "",
@@ -118,48 +120,86 @@ export function GlobalAdminsDialog() {
 
   const RESERVED_ROLE_NAMES = ["طالب", "student", "معلم", "teacher", "نائب معلم", "deputy_teacher", "مدير", "admin"]
 
-  const handleAddRole = async () => {
-    if (!newRoleName.trim()) {
+  const resetRoleForm = () => {
+    setNewRoleName("")
+    setEditingRoleName(null)
+  }
+
+  const handleStartEditRole = (roleName: string) => {
+    setEditingRoleName(roleName)
+    setNewRoleName(roleName)
+    setIsAddRoleMode(true)
+  }
+
+  const handleSaveRole = async () => {
+    const trimmedRoleName = newRoleName.trim()
+
+    if (!trimmedRoleName) {
       toast({ title: "تنبيه", description: "الرجاء إدخال المسمى الوظيفي", variant: "destructive" })
       return
     }
 
-    if (RESERVED_ROLE_NAMES.some(r => newRoleName.trim().toLowerCase() === r.toLowerCase())) {
-      toast({ title: "مسمى محجوز", description: `"${newRoleName.trim()}" اسم محجوز ولا يمكن استخدامه كمسمى وظيفي`, variant: "destructive" })
+    if (RESERVED_ROLE_NAMES.some(r => trimmedRoleName.toLowerCase() === r.toLowerCase())) {
+      toast({ title: "مسمى محجوز", description: `"${trimmedRoleName}" اسم محجوز ولا يمكن استخدامه كمسمى وظيفي`, variant: "destructive" })
       return
     }
 
-    if (roles.includes(newRoleName.trim())) {
+    if (roles.includes(trimmedRoleName) && trimmedRoleName !== editingRoleName) {
       toast({ title: "تنبيه", description: "المسمى الوظيفي مسجل مسبقاً", variant: "destructive" })
+      return
+    }
+
+    if (editingRoleName && trimmedRoleName === editingRoleName) {
+      resetRoleForm()
+      setIsAddRoleMode(false)
       return
     }
 
     setIsSubmitting(true)
     try {
-      const rolesRes = await fetch("/api/roles")
-      const rolesData = await rolesRes.json()
+      if (editingRoleName) {
+        const renameRes = await fetch("/api/roles", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldRole: editingRoleName, newRole: trimmedRoleName })
+        })
 
-      const updatedRoles = {
-        roles: [...(rolesData.roles || roles), newRoleName.trim()],
-        permissions: { ...(rolesData.permissions || {}), [newRoleName.trim()]: [] }
-      }
+        const renameData = await renameRes.json().catch(() => null)
+        if (!renameRes.ok) {
+          throw new Error(renameData?.error || "Failed to rename role")
+        }
 
-      const saveRes = await fetch("/api/roles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedRoles)
-      })
-
-      if (saveRes.ok) {
-        toast({ title: "تم الإضافة", description: `تم إضافة "${newRoleName}" بنجاح` })
-        setRoles(updatedRoles.roles)
-        setNewRoleName("")
-        setIsAddRoleMode(false)
+        setRoles((currentRoles) => currentRoles.map((role) => role === editingRoleName ? trimmedRoleName : role))
+        setUsers((currentUsers) => currentUsers.map((user) => user.role === editingRoleName ? { ...user, role: trimmedRoleName } : user))
+        setNewAdmin((prev) => ({ ...prev, role: prev.role === editingRoleName ? trimmedRoleName : prev.role }))
+        toast({ title: "تم التعديل", description: `تم تعديل "${editingRoleName}" إلى "${trimmedRoleName}"` })
       } else {
-        throw new Error("Failed to save")
+        const rolesRes = await fetch("/api/roles")
+        const rolesData = await rolesRes.json()
+
+        const updatedRoles = {
+          roles: [...(rolesData.roles || roles), trimmedRoleName],
+          permissions: { ...(rolesData.permissions || {}), [trimmedRoleName]: [] }
+        }
+
+        const saveRes = await fetch("/api/roles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedRoles)
+        })
+
+        if (!saveRes.ok) {
+          throw new Error("Failed to save")
+        }
+
+        toast({ title: "تم الإضافة", description: `تم إضافة "${trimmedRoleName}" بنجاح` })
+        setRoles(updatedRoles.roles)
       }
+
+      resetRoleForm()
+      setIsAddRoleMode(false)
     } catch {
-      toast({ title: "خطأ", description: "حدث خطأ أثناء حفظ المسمى", variant: "destructive" })
+      toast({ title: "خطأ", description: editingRoleName ? "حدث خطأ أثناء تعديل المسمى" : "حدث خطأ أثناء حفظ المسمى", variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -169,6 +209,15 @@ export function GlobalAdminsDialog() {
     if (!newAdmin.name || !newAdmin.account_number) {
       toast({ title: "تنبيه", description: "يرجى ملء الحقول الإجبارية", variant: "destructive" })
       return
+    }
+
+    if (newAdmin.phone_number.trim()) {
+      try {
+        normalizeGuardianPhoneForStorage(newAdmin.phone_number)
+      } catch {
+        toast({ title: "خطأ", description: "رقم الجوال غير صالح", variant: "destructive" })
+        return
+      }
     }
 
     setIsSubmitting(true)
@@ -191,8 +240,8 @@ export function GlobalAdminsDialog() {
       setNewAdmin({ name: "", account_number: "", phone_number: "", id_number: "", role: roles[0] || "سكرتير" })
       setIsAddMode(false)
       fetchData()
-    } catch {
-      toast({ title: "خطأ", description: "حدث خطأ أثناء الإضافة", variant: "destructive" })
+    } catch (error) {
+      toast({ title: "خطأ", description: error instanceof Error ? error.message : "حدث خطأ أثناء الإضافة", variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -275,10 +324,15 @@ export function GlobalAdminsDialog() {
           <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
 
           {/* Dialog: Add Role */}
-          <Dialog open={isAddRoleMode} onOpenChange={setIsAddRoleMode}>
+          <Dialog open={isAddRoleMode} onOpenChange={(open) => {
+            setIsAddRoleMode(open)
+            if (!open) {
+              resetRoleForm()
+            }
+          }}>
             <DialogContent className="sm:max-w-md bg-white border-[#3453a7]/20 font-cairo" dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-xl font-bold text-[#1a2332]">إضافة مسمى وظيفي جديد</DialogTitle>
+                <DialogTitle className="text-xl font-bold text-[#1a2332]">{editingRoleName ? "تعديل المسمى الوظيفي" : "إضافة مسمى وظيفي جديد"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -286,7 +340,7 @@ export function GlobalAdminsDialog() {
                   <Input
                     value={newRoleName}
                     onChange={e => setNewRoleName(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") handleAddRole() }}
+                    onKeyDown={e => { if (e.key === "Enter") handleSaveRole() }}
                   />
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -294,6 +348,11 @@ export function GlobalAdminsDialog() {
                   {roles.map(r => (
                     <span key={r} className="text-xs bg-[#3453a7]/10 text-[#4f73d1] border border-[#3453a7]/30 rounded-full pl-3 pr-2 py-1 flex items-center gap-1">
                       {r}
+                      <button
+                        onClick={() => handleStartEditRole(r)}
+                        className="w-4 h-4 rounded-full bg-[#3453a7]/20 hover:bg-[#3453a7]/30 flex items-center justify-center text-[#4f73d1] transition-colors"
+                        title="تعديل المسمى"
+                      ><Edit2 className="h-2.5 w-2.5" /></button>
                       <button
                         onClick={() => handleDeleteRole(r)}
                         className="w-4 h-4 rounded-full bg-[#3453a7]/20 hover:bg-red-100 hover:text-red-500 flex items-center justify-center text-[#4f73d1] transition-colors text-[10px] font-bold leading-none"
@@ -304,14 +363,17 @@ export function GlobalAdminsDialog() {
                 </div>
               </div>
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setIsAddRoleMode(false)}>إلغاء</Button>
-                <Button onClick={handleAddRole} disabled={isSubmitting} className="bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                <Button variant="outline" onClick={() => {
+                  resetRoleForm()
+                  setIsAddRoleMode(false)
+                }}>إلغاء</Button>
+                <Button onClick={handleSaveRole} disabled={isSubmitting} className="relative h-10 min-w-[140px] bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                  <span className={isSubmitting ? "invisible" : ""}>{editingRoleName ? "حفظ التعديل" : "حفظ المسمى"}</span>
                   {isSubmitting ? (
-                    <span className="flex items-center gap-2">
+                    <span className="absolute inset-0 flex items-center justify-center">
                       <SiteLoader size="sm" color="#f8f4ea" />
-                      جاري الحفظ...
                     </span>
-                  ) : "حفظ المسمى"}
+                  ) : null}
                 </Button>
               </div>
             </DialogContent>
@@ -359,13 +421,13 @@ export function GlobalAdminsDialog() {
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsAddMode(false)}>إلغاء</Button>
-                <Button onClick={handleAddAdmin} disabled={isSubmitting} className="bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                <Button onClick={handleAddAdmin} disabled={isSubmitting} className="relative h-10 min-w-[140px] bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                  <span className={isSubmitting ? "invisible" : ""}>حفظ</span>
                   {isSubmitting ? (
-                    <span className="flex items-center gap-2">
+                    <span className="absolute inset-0 flex items-center justify-center">
                       <SiteLoader size="sm" color="#f8f4ea" />
-                      جاري الحفظ...
                     </span>
-                  ) : "حفظ"}
+                  ) : null}
                 </Button>
               </div>
             </DialogContent>
