@@ -70,6 +70,14 @@ export function GlobalAddStudentDialog() {
     void fetchCircles()
   }, [isOpen])
 
+  const resetStudentForm = () => {
+    setNewStudentName("")
+    setNewStudentIdNumber("")
+    setNewStudentAccountNumber("")
+    setNewGuardianPhone("")
+    setSelectedCircleToAdd("")
+  }
+
   const handleClose = (open: boolean) => {
     if (!open) {
       // remove the action parameter from URL
@@ -106,11 +114,8 @@ export function GlobalAddStudentDialog() {
             description: `تم إضافة الطالب ${newStudentName} إلى ${selectedCircleToAdd} بنجاح`,
             className: "bg-gradient-to-r from-[#3453a7] to-[#4f73d1] text-white border-none",
           })
-          setNewStudentName("")
-          setNewStudentIdNumber("")
-          setNewStudentAccountNumber("")
-          setNewGuardianPhone("")
-          handleClose(false)
+          resetStudentForm()
+          router.refresh()
         } else {
           await showAlert(data.error || "فشل في إضافة الطالب", "خطأ")
         }

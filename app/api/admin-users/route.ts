@@ -59,6 +59,7 @@ export async function GET(request: Request) {
     const { session } = auth
     const { searchParams } = new URL(request.url)
     const currentOnly = searchParams.get("current") === "1"
+    const includeProtected = searchParams.get("includeProtected") === "1"
 
     const supabase = createAdminClient()
 
@@ -91,7 +92,7 @@ export async function GET(request: Request) {
 
     const users = (data || []).filter((user) => {
       const accountNumber = Number(user.account_number)
-      return isStaffRole(String(user.role || "")) && !isProtectedAdminAccount(accountNumber)
+      return isStaffRole(String(user.role || "")) && (includeProtected || !isProtectedAdminAccount(accountNumber))
     })
     return NextResponse.json({ users })
   } catch (error) {

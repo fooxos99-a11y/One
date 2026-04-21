@@ -37,6 +37,12 @@ type BulkQueueRecipientInput = {
   media?: OutgoingMediaInput | null
 }
 
+type MessageStatusRow = {
+  id: string
+  status: string | null
+  error_message?: string | null
+}
+
 async function insertWhatsAppHistoryRows(
   supabase: ReturnType<typeof createAdminClient>,
   rows: Array<{
@@ -285,6 +291,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         queuedCount: bulkResult.queuedCount,
+        queuedIds: bulkResult.queuedIds,
         failedCount: bulkResult.failedCount,
         invalidPhoneCount: bulkResult.invalidPhoneCount,
         missingPhoneCount: bulkResult.missingPhoneCount,
@@ -311,6 +318,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       queuedMessage,
+      queuedIds: [data.id],
       message: "تمت إضافة الرسالة إلى طابور الإرسال بنجاح",
     })
   } catch (error) {
@@ -402,6 +410,7 @@ async function enqueueMessagesBulk(params: {
     sent_by: string | null
     sent_at: null
   }> = []
+  const queuedIds: string[] = []
   let invalidPhoneCount = 0
   let missingPhoneCount = 0
 
@@ -429,6 +438,7 @@ async function enqueueMessagesBulk(params: {
     }
 
     const id = crypto.randomUUID()
+    queuedIds.push(id)
     const messageType = resolvedMedia ? "image" : "text"
     queueRows.push({
       id,
@@ -466,6 +476,7 @@ async function enqueueMessagesBulk(params: {
 
   return {
     queuedCount: queueRows.length,
+    queuedIds,
     failedCount: invalidPhoneCount + missingPhoneCount,
     invalidPhoneCount,
     missingPhoneCount,
@@ -483,6 +494,28 @@ export async function GET(request: Request) {
       return auth.response
     }
     const supabase = createAdminClient()
+    const { searchParams } = new URL(request.url)
+    const ids = (searchParams.get("ids") || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    if (ids.length > 0) {
+      const { data: statuses, error: statusesError } = await supabase
+        .from(WHATSAPP_HISTORY_TABLE)
+        .select("id, status, error_message")
+        .in("id", ids)
+
+      if (statusesError) {
+        console.error("[Database] Error fetching message statuses:", statusesError)
+        return NextResponse.json(
+          { error: "فشل في جلب حالة الرسائل" },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({ statuses: (statuses || []) as MessageStatusRow[] })
+    }
 
     const { data: messages, error } = await supabase
       .from(WHATSAPP_HISTORY_TABLE)

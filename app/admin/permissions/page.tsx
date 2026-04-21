@@ -111,11 +111,20 @@ export default function PermissionsPage() {
 
   const [roles, setRoles] = useState<string[]>(DEFAULT_ROLES)
   const [permissions, setPermissions] = useState<PermissionsMap>({})
+  const [savedPermissions, setSavedPermissions] = useState<PermissionsMap>({})
   const [selectedRole, setSelectedRole] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+
+  const normalizePermissionList = (items: string[] = []) => [...items].sort((first, second) => first.localeCompare(second, "ar"))
+
+  const arePermissionsEqual = (left: string[] = [], right: string[] = []) => {
+    const normalizedLeft = normalizePermissionList(left)
+    const normalizedRight = normalizePermissionList(right)
+    return JSON.stringify(normalizedLeft) === JSON.stringify(normalizedRight)
+  }
 
   useEffect(() => {
     const loggedIn = localStorage.getItem("isLoggedIn") === "true"
@@ -138,6 +147,7 @@ export default function PermissionsPage() {
       fetchedRoles.forEach((r: string) => { normalized[r] = fetchedPerms[r] || [] })
       setRoles(fetchedRoles)
       setPermissions(normalized)
+      setSavedPermissions(normalized)
       if (fetchedRoles.length > 0) setSelectedRole(fetchedRoles[0])
     } catch {
       toast({ title: "خطأ", description: "تعذر جلب بيانات الصلاحيات", variant: "destructive" })
@@ -189,17 +199,28 @@ export default function PermissionsPage() {
   }
 
   const savePermissions = async () => {
+    const changedRoles = roles.filter((role) => !arePermissionsEqual(permissions[role] || [], savedPermissions[role] || []))
+
+    if (changedRoles.length === 0) {
+      toast({ title: "لا توجد تغييرات", description: "لم يتم تعديل أي صلاحيات جديدة" })
+      return
+    }
+
     setIsSaving(true)
     try {
-      const res = await fetch("/api/roles")
-      const data = await res.json()
       const saveRes = await fetch("/api/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roles: data.roles || roles, permissions })
+        body: JSON.stringify({ roles: ["مدير", ...roles], permissions: { مدير: ["all"], ...permissions } })
       })
       if (saveRes.ok) {
-        toast({ title: " تم الحفظ", description: `تم حفظ صلاحيات "${selectedRole}" بنجاح` })
+        setSavedPermissions(permissions)
+        toast({
+          title: "تم الحفظ",
+          description: changedRoles.length === 1
+            ? `تم حفظ صلاحيات "${changedRoles[0]}" بنجاح`
+            : `تم حفظ صلاحيات ${changedRoles.length} مسميات وظيفية بنجاح`,
+        })
       } else throw new Error("save failed")
     } catch {
       toast({ title: "خطأ", description: "حدث خطأ أثناء حفظ الصلاحيات", variant: "destructive" })
@@ -224,6 +245,7 @@ export default function PermissionsPage() {
   const totalCount = ALL_PERMISSION_ITEMS.length
   const allGranted = grantedCount === totalCount
   const progressPct = totalCount === 0 ? 0 : Math.round((grantedCount / totalCount) * 100)
+  const changedRolesCount = roles.filter((role) => !arePermissionsEqual(permissions[role] || [], savedPermissions[role] || [])).length
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f7f5f0]" dir="rtl">
@@ -351,7 +373,11 @@ export default function PermissionsPage() {
               {/* Footer save */}
               <div className="px-6 py-4 bg-[#fafaf8] border-t border-[#f0ebe0] flex items-center justify-between">
                 <p className="text-xs text-neutral-400">
-                  {grantedCount === 0 ? "لا توجد صلاحيات مفعّلة" : `${grantedCount} صلاحية مفعّلة  ${totalCount - grantedCount} موقوفة`}
+                  {changedRolesCount > 0
+                    ? `يوجد ${changedRolesCount} ${changedRolesCount === 1 ? "مسمى معدل" : "مسميات معدلة"} بانتظار الحفظ`
+                    : grantedCount === 0
+                      ? "لا توجد صلاحيات مفعّلة"
+                      : `${grantedCount} صلاحية مفعّلة  ${totalCount - grantedCount} موقوفة`}
                 </p>
                 <button
                   onClick={savePermissions}

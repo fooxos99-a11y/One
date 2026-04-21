@@ -38,6 +38,19 @@ type OutgoingImagePayload = {
   previewUrl: string
 }
 
+type SendResults = {
+  queued: number
+  sent: number
+  pending: number
+  failed: number
+}
+
+type QueuedMessageStatus = {
+  id: string
+  status: string | null
+  error_message?: string | null
+}
+
 const OUTBOUND_IMAGE_MAX_SIZE_BYTES = 50 * 1024 * 1024
 const OUTBOUND_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 
@@ -112,6 +125,10 @@ function getRecipientSecondaryLabel(recipient: Recipient) {
   return details.filter(Boolean).join(" • ") || "بدون حلقة"
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export default function WhatsAppSendPage() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("الإرسال إلى أولياء الأمور")
   const { isReady: isWhatsAppReady, isLoading: isWhatsAppStatusLoading } = useWhatsAppStatus()
@@ -135,8 +152,36 @@ export default function WhatsAppSendPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedFilter, setSelectedFilter] = useState("all")
   const [isSending, setIsSending] = useState(false)
-  const [sendResults, setSendResults] = useState<{ success: number; failed: number } | null>(null)
+  const [sendResults, setSendResults] = useState<SendResults | null>(null)
   const [imagePayload, setImagePayload] = useState<OutgoingImagePayload | null>(null)
+
+  const pollQueuedMessagesStatus = async (queuedIds: string[]) => {
+    if (queuedIds.length === 0) {
+      return [] as QueuedMessageStatus[]
+    }
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const response = await fetch(`/api/whatsapp/send?ids=${encodeURIComponent(queuedIds.join(","))}`, {
+        cache: "no-store",
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || "تعذر جلب حالة الرسائل")
+      }
+
+      const statuses = Array.isArray(data.statuses) ? (data.statuses as QueuedMessageStatus[]) : []
+      const pendingStatuses = statuses.filter((status) => !status.status || status.status === "pending")
+
+      if (pendingStatuses.length === 0 || attempt === 7) {
+        return statuses
+      }
+
+      await sleep(2000)
+    }
+
+    return [] as QueuedMessageStatus[]
+  }
 
   const currentRecipients = recipientsByGroup[selectedRecipientGroup]
   const filterOptions = Array.from(
@@ -266,7 +311,7 @@ export default function WhatsAppSendPage() {
         const [studentsResponse, teachersResponse, adminsResponse] = await Promise.all([
           fetch("/api/students"),
           fetch("/api/teachers"),
-          fetch("/api/admin-users"),
+          fetch("/api/admin-users?includeProtected=1"),
         ])
 
         const [studentsData, teachersData, adminsData] = await Promise.all([
@@ -456,15 +501,46 @@ export default function WhatsAppSendPage() {
         throw new Error(data.error || "فشل في تجهيز رسائل واتساب")
       }
 
-      const successCount = Number(data.queuedCount) || 0
+      const queuedCount = Number(data.queuedCount) || 0
       const failedCount = Number(data.failedCount) || 0
-      setSendResults({ success: successCount, failed: failedCount })
+      const queuedIds = Array.isArray(data.queuedIds) ? data.queuedIds.filter((value: unknown) => typeof value === "string") : []
 
-      if (successCount > 0) {
-        toast({
-          title: "تم تجهيز الرسائل",
-          description: `تم تجهيز ${successCount} رسالة واتساب${failedCount > 0 ? ` وتعذر تجهيز ${failedCount}` : ""}`,
+      setSendResults({ queued: queuedCount, sent: 0, pending: queuedCount, failed: failedCount })
+
+      if (queuedCount > 0) {
+        const statuses = await pollQueuedMessagesStatus(queuedIds)
+        const sentCount = statuses.filter((status) => status.status === "sent").length
+        const workerFailedCount = statuses.filter((status) => status.status === "failed").length
+        const pendingCount = Math.max(queuedCount - sentCount - workerFailedCount, 0)
+        const totalFailedCount = failedCount + workerFailedCount
+
+        setSendResults({
+          queued: queuedCount,
+          sent: sentCount,
+          pending: pendingCount,
+          failed: totalFailedCount,
         })
+
+        if (sentCount > 0 && pendingCount === 0 && totalFailedCount === 0) {
+          toast({
+            title: "تم إرسال الرسائل",
+            description: `تم إرسال ${sentCount} رسالة واتساب بنجاح`,
+          })
+        } else if (pendingCount > 0) {
+          toast({
+            title: "الرسائل قيد المعالجة",
+            description: `تم إرسال ${sentCount} رسالة، وما زال ${pendingCount} بانتظار المعالجة${totalFailedCount > 0 ? `، وفشل ${totalFailedCount}` : ""}`,
+          })
+        } else {
+          toast({
+            title: sentCount > 0 ? "اكتمل الإرسال جزئيًا" : "تعذر الإرسال",
+            description: sentCount > 0
+              ? `تم إرسال ${sentCount} رسالة وتعذر إرسال ${totalFailedCount}`
+              : `تعذر إرسال ${totalFailedCount} رسالة`,
+            variant: sentCount > 0 ? "default" : "destructive",
+          })
+        }
+
         setMessage("")
         clearImageSelection()
         setSelectedRecipients([])
@@ -670,11 +746,21 @@ export default function WhatsAppSendPage() {
 
                     {sendResults ? (
                       <div className="space-y-2 rounded-lg bg-white p-4">
-                        <h4 className="font-semibold text-[#1a2332]">نتائج الإرسال:</h4>
+                        <h4 className="font-semibold text-[#1a2332]">نتائج الإرسال الفعلية:</h4>
+                        <div className="flex items-center gap-2 text-[#3453a7]">
+                          <MessageCircle className="w-4 h-4" />
+                          <span>أضيف للطابور: {sendResults.queued}</span>
+                        </div>
                         <div className="flex items-center gap-2 text-green-600">
                           <CheckCircle2 className="w-4 h-4" />
-                          <span>تم التجهيز إلى: {sendResults.success}</span>
+                          <span>تم الإرسال فعليًا: {sendResults.sent}</span>
                         </div>
+                        {sendResults.pending > 0 ? (
+                          <div className="flex items-center gap-2 text-amber-600">
+                            <CircleAlert className="w-4 h-4" />
+                            <span>قيد الانتظار: {sendResults.pending}</span>
+                          </div>
+                        ) : null}
                         {sendResults.failed > 0 ? (
                           <div className="flex items-center gap-2 text-red-600">
                             <XCircle className="w-4 h-4" />

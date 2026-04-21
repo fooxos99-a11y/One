@@ -90,7 +90,7 @@ export function GlobalCirclesDialog() {
           localStorage.removeItem("circlesCache")
           localStorage.removeItem("circlesCacheTime")
           setNewCircleName("")
-          setIsAddDialogOpen(false)
+          window.dispatchEvent(new Event("circlesChanged"))
           await showAlert(`تم إضافة حلقة ${newCircleName} بنجاح. سيتم إنشاؤها عند إضافة أول طالب.`, "نجاح")
           fetchCircles()
         } else {
@@ -308,7 +308,7 @@ export function GlobalCirclesDialog() {
                 id="circleName"
                 value={newCircleName}
                 onChange={(e) => setNewCircleName(e.target.value)}
-                placeholder="مثال: حلقة أبو بكر الصديق"
+                placeholder="حلقة أبو بكر الصديق"
                 onKeyDown={(e) => e.key === "Enter" && handleAddCircle()}
               />
             </div>

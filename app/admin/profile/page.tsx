@@ -58,7 +58,7 @@ function createFallbackAdminData() {
 }
 
 export default function AdminProfilePage() {
-  const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth();
+  const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth()
 
   const [isLoading, setIsLoading] = useState(true)
   const [adminData, setAdminData] = useState<AdminData | null>(null)
@@ -72,14 +72,12 @@ export default function AdminProfilePage() {
   const alertDialog = useAlertDialog()
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true"
-    const userRole = localStorage.getItem("userRole")
-    if (!loggedIn || userRole === "student" || userRole === "teacher" || userRole === "deputy_teacher" || !userRole) {
-      router.push("/login")
-    } else {
-      fetchAdminData()
+    if (authLoading || !authVerified) {
+      return
     }
-  }, [router])
+
+    void fetchAdminData()
+  }, [authLoading, authVerified])
 
   const fetchAdminData = async () => {
     const fallbackAdminData = createFallbackAdminData()
@@ -213,7 +211,7 @@ export default function AdminProfilePage() {
             <p className="text-2xl text-[#1a2332] mb-4">لم يتم العثور على بيانات الإداري</p>
             <Button
               onClick={() => router.push("/login")}
-              className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] hover:from-[#4f73d1] hover:to-[#b88341] text-[#20335f] font-bold"
+              className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] text-white font-bold hover:from-[#2c4998] hover:to-[#3f63c3] focus-visible:ring-2 focus-visible:ring-[#3453a7]/30"
             >
               العودة لتسجيل الدخول
             </Button>
@@ -224,7 +222,9 @@ export default function AdminProfilePage() {
     )
   }
 
-    if (authLoading || !authVerified) return (<div className="min-h-screen flex items-center justify-center bg-[#fafaf9]"><SiteLoader size="md" /></div>);
+  if (authLoading || !authVerified) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#fafaf9]"><SiteLoader size="md" /></div>
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f5f1e8] to-white">
@@ -257,7 +257,7 @@ export default function AdminProfilePage() {
               {!isEditing && (
                 <Button
                   onClick={() => setIsEditing(true)}
-                  className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] hover:from-[#4f73d1] hover:to-[#b88341] text-white font-bold"
+                  className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] text-white font-bold hover:from-[#2c4998] hover:to-[#3f63c3] focus-visible:ring-2 focus-visible:ring-[#3453a7]/30"
                 >
                   <Edit2 className="w-4 h-4 ml-2" />
                   تعديل البيانات
@@ -329,7 +329,7 @@ export default function AdminProfilePage() {
                   <Button
                     onClick={handleCancel}
                     variant="outline"
-                    className="font-bold bg-transparent"
+                    className="font-bold bg-transparent border-[#3453a7]/40 text-[#3453a7] hover:bg-[#3453a7]/10 hover:text-[#3453a7] focus-visible:ring-2 focus-visible:ring-[#3453a7]/20"
                     disabled={isSaving}
                   >
                     <X className="w-4 h-4 ml-2" />
@@ -337,7 +337,7 @@ export default function AdminProfilePage() {
                   </Button>
                   <Button
                     onClick={handleSave}
-                    className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] hover:from-[#4f73d1] hover:to-[#b88341] text-[#20335f] font-bold"
+                    className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] text-white font-bold hover:from-[#2c4998] hover:to-[#3f63c3] focus-visible:ring-2 focus-visible:ring-[#3453a7]/30"
                     disabled={isSaving}
                   >
                     <Save className="w-4 h-4 ml-2" />

@@ -289,8 +289,6 @@ export default function TeacherManagement() {
           setNewTeacherAccountNumber("")
           setSelectedHalaqah("")
           setNewTeacherRole("teacher")
-          setAddDialogView("options")
-          setIsAddDialogOpen(false)
           await showAlert(`تم إضافة ${roleLabel} ${addedTeacherName} إلى ${addedTeacherHalaqah} بنجاح`, "نجاح")
         } else {
           await showAlert(data?.error || "فشل في إضافة المعلم", "خطأ")
@@ -450,8 +448,6 @@ export default function TeacherManagement() {
 
       await fetchTeachers()
       setBulkTeachers([createBulkTeacherDraft()])
-      setAddDialogView("options")
-      setIsAddDialogOpen(false)
 
       if (Array.isArray(data.rejectedRows) && data.rejectedRows.length > 0) {
         const rejectedSummary = data.rejectedRows
@@ -559,7 +555,7 @@ export default function TeacherManagement() {
                 setAddDialogView("options")
               }
             }}>
-              <DialogContent className={addDialogView === "bulk" ? "sm:max-w-[1100px] max-h-[90vh] overflow-y-auto" : addDialogView === "single" ? "sm:max-w-[480px]" : "sm:max-w-[420px]"}>
+              <DialogContent className={addDialogView === "bulk" ? "flex max-h-[85vh] sm:max-w-[920px] flex-col overflow-hidden p-0" : addDialogView === "single" ? "sm:max-w-[480px]" : "sm:max-w-[420px]"}>
                 <DialogHeader>
                   <DialogTitle className="text-xl text-[#1a2332]">
                     {addDialogView === "bulk" ? "إضافة جماعية للمعلمين" : addDialogView === "single" ? "إضافة معلم جديد" : "إضافة معلم"}
@@ -648,23 +644,34 @@ export default function TeacherManagement() {
 
                 {addDialogView === "bulk" ? (
                   <>
-                    <div className="space-y-5 py-2">
-                      <div className="flex flex-col gap-3 rounded-2xl border border-[#3453a7]/20 bg-[#fafcff] p-4 md:flex-row md:items-center md:justify-between">
+                    <div className="shrink-0 border-b border-[#3453a7]/15 bg-[#f8fbff] px-4 py-4 sm:px-6">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="space-y-1 text-right">
-                          <p className="text-sm font-bold text-[#1a2332]">رفع ملف إكسل</p>
-                          <p className="text-xs text-neutral-500">الأعمدة المدعومة: اسم المعلم، رقم الهوية، الحلقة.</p>
+                          <p className="text-sm font-bold text-[#1a2332]">إضافة مرتبة وسهلة</p>
+                          <p className="text-xs leading-6 text-neutral-500">جميع الصفوف داخل مساحة تمرير مستقلة، مع أزرار واضحة أعلى وأسفل النافذة.</p>
                         </div>
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#3453a7]/40 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
-                          <Upload className="h-4 w-4" />
-                          رفع إكسل
-                          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportTeachersFile} />
-                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <div className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[#3453a7] shadow-sm ring-1 ring-[#3453a7]/15">
+                            عدد الصفوف: {bulkTeachers.length}
+                          </div>
+                          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#3453a7]/30 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
+                            <Upload className="h-4 w-4" />
+                            رفع إكسل
+                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportTeachersFile} />
+                          </label>
+                          <button type="button" onClick={addBulkTeacherRow} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#3453a7]/30 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
+                            <Plus className="h-4 w-4" />
+                            إضافة صف
+                          </button>
+                        </div>
                       </div>
+                    </div>
 
+                    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                       <div className="space-y-3">
                         {bulkTeachers.map((draft, index) => (
-                          <div key={draft.id} className="rounded-2xl border border-[#3453a7]/20 bg-white p-4 shadow-sm">
-                            <div className="mb-3 flex items-center justify-between gap-3">
+                          <div key={draft.id} className="rounded-2xl border border-[#3453a7]/15 bg-white p-4 shadow-sm">
+                            <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#3453a7]/10 pb-3">
                               <div className="text-sm font-bold text-[#1a2332]">المعلم {index + 1}</div>
                               <button
                                 type="button"
@@ -676,7 +683,7 @@ export default function TeacherManagement() {
                               </button>
                             </div>
 
-                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                               <div className="space-y-2">
                                 <Label className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
                                 <Input value={draft.name} onChange={(event) => updateBulkTeacher(draft.id, { name: event.target.value })} placeholder="اسم المعلم" />
@@ -697,7 +704,7 @@ export default function TeacherManagement() {
                                 <Label className="text-sm font-semibold text-[#1a2332]">الحلقة</Label>
                                 <Select value={draft.selectedHalaqah} onValueChange={(value) => updateBulkTeacher(draft.id, { selectedHalaqah: value })}>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="اختيار" />
+                                    <SelectValue placeholder="اختر الحلقة" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {circles.map((circle) => (
@@ -722,16 +729,9 @@ export default function TeacherManagement() {
                           </div>
                         ))}
                       </div>
-
-                      <div className="flex justify-start">
-                        <Button type="button" variant="outline" onClick={addBulkTeacherRow} className="border-[#3453a7]/50 text-[#4f73d1] hover:bg-[#3453a7]/10">
-                          <Plus className="me-2 h-4 w-4" />
-                          إضافة صف جديد
-                        </Button>
-                      </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-2">
+                    <div className="shrink-0 flex justify-end gap-3 border-t border-[#3453a7]/15 px-4 py-4 sm:px-6">
                       <Button variant="outline" onClick={() => setAddDialogView("options")} className="border-[#3453a7]/50 text-neutral-600">رجوع</Button>
                       <Button onClick={handleBulkAddTeachers} disabled={isSavingBulk} className="border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-60">{isSavingBulk ? "جاري الإضافة..." : "إضافة المعلمين"}</Button>
                     </div>
@@ -758,7 +758,7 @@ export default function TeacherManagement() {
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="editIdNumber" className="text-sm font-semibold text-[#1a2332]">رقم الهوية</Label>
-                    <Input id="editIdNumber" value={editIdNumber} onChange={(e) => setEditIdNumber(e.target.value)} placeholder="أدخل رقم الهوية" dir="ltr" />
+                    <Input id="editIdNumber" value={editIdNumber} onChange={(e) => setEditIdNumber(e.target.value)} placeholder="أدخل رقم الهوية" dir="ltr" lang="en" inputMode="numeric" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="editPhoneNumber" className="text-sm font-semibold text-[#1a2332]">رقم الجوال</Label>

@@ -253,6 +253,8 @@ export function GlobalEditStudentDialog() {
 									placeholder="أدخل رقم الهوية"
 									className="text-sm"
 									dir="ltr"
+									lang="en"
+									inputMode="numeric"
 								/>
 							</div>
 							<div className="space-y-2">
