@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,12 +19,16 @@ import { SiteLoader } from "@/components/ui/site-loader"
 import { formatGuardianPhoneForDisplay } from "@/lib/phone-number"
 import { getOfflineErrorMessage } from "@/lib/network-error"
 
-interface Student {
+type RecipientGroup = "guardians" | "teachers" | "admins"
+
+type Recipient = {
   id: string
   name: string
-  guardian_phone: string
-  account_number: number
-  halaqah?: string | null
+  phoneNumber: string
+  accountNumber: string
+  halaqah: string
+  role: string
+  group: RecipientGroup
 }
 
 type OutgoingImagePayload = {
@@ -37,20 +41,30 @@ type OutgoingImagePayload = {
 const OUTBOUND_IMAGE_MAX_SIZE_BYTES = 50 * 1024 * 1024
 const OUTBOUND_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 
+const RECIPIENT_GROUP_LABELS: Record<RecipientGroup, string> = {
+  guardians: "أولياء الأمور",
+  teachers: "المعلمين",
+  admins: "الإداريين",
+}
+
 const TEMPLATE_VARIABLES = [
-  { token: "{name}", label: "اسم الطالب", sample: "أحمد محمد" },
-  { token: "{halaqah}", label: "اسم الحلقة", sample: "حلقة أبي بن كعب" },
+  { token: "{name}", label: "الاسم", sample: "أحمد محمد" },
   { token: "{account_number}", label: "رقم الحساب", sample: "10234" },
-  { token: "{guardian_phone}", label: "رقم ولي الأمر", sample: "0551234567" },
+  { token: "{phone_number}", label: "رقم الجوال", sample: "0551234567" },
+  { token: "{halaqah}", label: "الحلقة", sample: "حلقة أبي بن كعب" },
+  { token: "{role}", label: "المسمى الوظيفي", sample: "مشرف تعليمي" },
+  { token: "{recipient_type}", label: "نوع المستلم", sample: "المعلمين" },
   { token: "{date}", label: "تاريخ اليوم", sample: "09/04/2026" },
 ] as const
 
-function resolveMessageTemplate(template: string, student: Student) {
+function resolveMessageTemplate(template: string, recipient: Recipient) {
   const replacements: Record<string, string> = {
-    "{name}": student.name || "",
-    "{halaqah}": (student.halaqah || "").trim(),
-    "{account_number}": student.account_number ? String(student.account_number) : "",
-    "{guardian_phone}": formatGuardianPhoneForDisplay(student.guardian_phone),
+    "{name}": recipient.name || "",
+    "{account_number}": recipient.accountNumber || "",
+    "{phone_number}": formatGuardianPhoneForDisplay(recipient.phoneNumber),
+    "{halaqah}": recipient.halaqah || "",
+    "{role}": recipient.role || "",
+    "{recipient_type}": RECIPIENT_GROUP_LABELS[recipient.group],
     "{date}": new Intl.DateTimeFormat("ar-SA").format(new Date()),
   }
 
@@ -81,76 +95,106 @@ function extractBase64FromDataUrl(dataUrl: string) {
   return separatorIndex >= 0 ? dataUrl.slice(separatorIndex + 1) : dataUrl
 }
 
+function getRecipientFilterLabel(group: RecipientGroup) {
+  return group === "admins" ? "كل المسميات" : "كل الحلقات"
+}
+
+function getRecipientSecondaryLabel(recipient: Recipient) {
+  if (recipient.group === "admins") {
+    return recipient.role || "بدون مسمى"
+  }
+
+  const details = [recipient.halaqah]
+  if (recipient.group === "teachers" && recipient.role) {
+    details.push(recipient.role === "deputy_teacher" ? "نائب معلم" : "معلم")
+  }
+
+  return details.filter(Boolean).join(" • ") || "بدون حلقة"
+}
+
 export default function WhatsAppSendPage() {
-  const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("الإرسال إلى أولياء الأمور");
+  const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("الإرسال إلى أولياء الأمور")
   const { isReady: isWhatsAppReady, isLoading: isWhatsAppStatusLoading } = useWhatsAppStatus()
+  const router = useRouter()
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-    // إدارة الرسائل الجاهزة المشتركة
-    const [readyMessages, setReadyMessages] = useState<{id:number,text:string}[]>([])
-    const [isLoadingReady, setIsLoadingReady] = useState(false)
-
-    // جلب الرسائل الجاهزة من قاعدة البيانات
-    const fetchReadyMessages = async () => {
-      setIsLoadingReady(true)
-      try {
-        const res = await fetch("/api/whatsapp-ready-messages")
-        const data = await res.json()
-        if (data.messages) setReadyMessages(data.messages)
-      } catch (e) {
-        setReadyMessages([])
-      } finally {
-        setIsLoadingReady(false)
-      }
-    }
-
-    // إضافة رسالة جاهزة
-    const handleAddReadyMessage = async () => {
-      if (!quickText.trim()) return
-      try {
-        const res = await fetch("/api/whatsapp-ready-messages", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({text: quickText})
-        })
-        const data = await res.json()
-        if (data.message) {
-          setQuickText("")
-          fetchReadyMessages()
-        }
-      } catch {}
-    }
-
-    // حذف رسالة جاهزة
-    const handleDeleteReadyMessage = async (id:number) => {
-      try {
-        await fetch("/api/whatsapp-ready-messages", {
-          method: "DELETE",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({id})
-        })
-        fetchReadyMessages()
-      } catch {}
-    }
-
-    useEffect(() => {
-      fetchReadyMessages()
-    }, [])
+  const [readyMessages, setReadyMessages] = useState<{ id: number; text: string }[]>([])
+  const [isLoadingReady, setIsLoadingReady] = useState(false)
+  const [quickText, setQuickText] = useState("")
   const [isLoading, setIsLoading] = useState(true)
-  const [students, setStudents] = useState<Student[]>([])
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>([])
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([])
+  const [recipientsByGroup, setRecipientsByGroup] = useState<Record<RecipientGroup, Recipient[]>>({
+    guardians: [],
+    teachers: [],
+    admins: [],
+  })
+  const [selectedRecipientGroup, setSelectedRecipientGroup] = useState<RecipientGroup>("guardians")
+  const [filteredRecipients, setFilteredRecipients] = useState<Recipient[]>([])
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
   const [message, setMessage] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedHalaqah, setSelectedHalaqah] = useState("all")
+  const [selectedFilter, setSelectedFilter] = useState("all")
   const [isSending, setIsSending] = useState(false)
   const [sendResults, setSendResults] = useState<{ success: number; failed: number } | null>(null)
   const [imagePayload, setImagePayload] = useState<OutgoingImagePayload | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const router = useRouter()
-  const { toast } = useToast()
 
-    // نص مخصص للإدراج السريع
-    const [quickText, setQuickText] = useState("")
+  const currentRecipients = recipientsByGroup[selectedRecipientGroup]
+  const filterOptions = Array.from(
+    new Set(
+      currentRecipients
+        .map((recipient) => (selectedRecipientGroup === "admins" ? recipient.role : recipient.halaqah).trim())
+        .filter(Boolean),
+    ),
+  ).sort((first, second) => first.localeCompare(second, "ar"))
+
+  const fetchReadyMessages = async () => {
+    setIsLoadingReady(true)
+    try {
+      const res = await fetch("/api/whatsapp-ready-messages")
+      const data = await res.json()
+      if (data.messages) {
+        setReadyMessages(data.messages)
+      }
+    } catch {
+      setReadyMessages([])
+    } finally {
+      setIsLoadingReady(false)
+    }
+  }
+
+  const handleAddReadyMessage = async () => {
+    if (!quickText.trim()) {
+      return
+    }
+
+    try {
+      const res = await fetch("/api/whatsapp-ready-messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: quickText }),
+      })
+      const data = await res.json()
+      if (data.message) {
+        setQuickText("")
+        await fetchReadyMessages()
+      }
+    } catch {
+      return
+    }
+  }
+
+  const handleDeleteReadyMessage = async (id: number) => {
+    try {
+      await fetch("/api/whatsapp-ready-messages", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      await fetchReadyMessages()
+    } catch {
+      return
+    }
+  }
 
   const clearImageSelection = () => {
     setImagePayload(null)
@@ -161,7 +205,6 @@ export default function WhatsAppSendPage() {
 
   const handleImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-
     if (!file) {
       return
     }
@@ -206,79 +249,138 @@ export default function WhatsAppSendPage() {
   }
 
   useEffect(() => {
+    void fetchReadyMessages()
+  }, [])
+
+  useEffect(() => {
     const loggedIn = localStorage.getItem("isLoggedIn") === "true"
     const userRole = localStorage.getItem("userRole")
 
     if (!loggedIn || !userRole || userRole === "student" || userRole === "teacher" || userRole === "deputy_teacher") {
       router.push("/login")
-    } else {
-      fetchStudents()
+      return
     }
-  }, [router])
+
+    const fetchRecipients = async () => {
+      try {
+        const [studentsResponse, teachersResponse, adminsResponse] = await Promise.all([
+          fetch("/api/students"),
+          fetch("/api/teachers"),
+          fetch("/api/admin-users"),
+        ])
+
+        const [studentsData, teachersData, adminsData] = await Promise.all([
+          studentsResponse.json().catch(() => ({})),
+          teachersResponse.json().catch(() => ({})),
+          adminsResponse.json().catch(() => ({})),
+        ])
+
+        const guardians = Array.isArray(studentsData.students)
+          ? studentsData.students
+              .filter((student: any) => String(student.guardian_phone || "").trim())
+              .map((student: any) => ({
+                id: String(student.id),
+                name: String(student.name || ""),
+                phoneNumber: String(student.guardian_phone || "").trim(),
+                accountNumber: String(student.account_number || ""),
+                halaqah: String(student.halaqah || student.circle_name || "").trim(),
+                role: "",
+                group: "guardians" as const,
+              }))
+          : []
+
+        const teachers = Array.isArray(teachersData.teachers)
+          ? teachersData.teachers
+              .filter((teacher: any) => String(teacher.phoneNumber || teacher.phone_number || "").trim())
+              .map((teacher: any) => ({
+                id: String(teacher.id),
+                name: String(teacher.name || ""),
+                phoneNumber: String(teacher.phoneNumber || teacher.phone_number || "").trim(),
+                accountNumber: String(teacher.accountNumber || teacher.account_number || ""),
+                halaqah: String(teacher.halaqah || "").trim(),
+                role: String(teacher.role || "teacher"),
+                group: "teachers" as const,
+              }))
+          : []
+
+        const admins = Array.isArray(adminsData.users)
+          ? adminsData.users
+              .filter((user: any) => String(user.phone_number || "").trim())
+              .map((user: any) => ({
+                id: String(user.id),
+                name: String(user.name || ""),
+                phoneNumber: String(user.phone_number || "").trim(),
+                accountNumber: String(user.account_number || ""),
+                halaqah: "",
+                role: String(user.role || ""),
+                group: "admins" as const,
+              }))
+          : []
+
+        setRecipientsByGroup({ guardians, teachers, admins })
+      } catch (error) {
+        console.error("Error fetching recipients:", error)
+        toast({
+          title: "خطأ",
+          description: "فشل في جلب بيانات المستلمين",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void fetchRecipients()
+  }, [router, toast])
 
   useEffect(() => {
-    let nextStudents = [...students]
+    let nextRecipients = [...currentRecipients]
 
-    if (selectedHalaqah !== "all") {
-      nextStudents = nextStudents.filter(
-        (student) => (student.halaqah || "").trim() === selectedHalaqah,
-      )
+    if (selectedFilter !== "all") {
+      nextRecipients = nextRecipients.filter((recipient) => {
+        const candidate = selectedRecipientGroup === "admins" ? recipient.role : recipient.halaqah
+        return candidate.trim() === selectedFilter
+      })
     }
 
     if (searchTerm.trim()) {
       const normalizedSearch = searchTerm.toLowerCase()
-      nextStudents = nextStudents.filter(
-        (student) =>
-          student.name.toLowerCase().includes(normalizedSearch) ||
-          student.guardian_phone?.includes(searchTerm) ||
-          student.account_number.toString().includes(searchTerm) ||
-          (student.halaqah || "").toLowerCase().includes(normalizedSearch),
+      nextRecipients = nextRecipients.filter((recipient) =>
+        recipient.name.toLowerCase().includes(normalizedSearch) ||
+        recipient.phoneNumber.includes(searchTerm) ||
+        recipient.accountNumber.includes(searchTerm) ||
+        recipient.halaqah.toLowerCase().includes(normalizedSearch) ||
+        recipient.role.toLowerCase().includes(normalizedSearch),
       )
     }
 
-    setFilteredStudents(nextStudents)
-  }, [searchTerm, selectedHalaqah, students])
+    setFilteredRecipients(nextRecipients)
+  }, [currentRecipients, searchTerm, selectedFilter, selectedRecipientGroup])
 
-  const fetchStudents = async () => {
-    try {
-      const response = await fetch("/api/students")
-      const data = await response.json()
-
-      if (data.students) {
-        // فلترة الطلاب الذين لديهم أرقام أولياء أمور
-        const studentsWithPhones = data.students.filter(
-          (s: Student) => s.guardian_phone && s.guardian_phone.trim() !== ""
-        )
-        setStudents(studentsWithPhones)
-        setFilteredStudents(studentsWithPhones)
-      }
-    } catch (error) {
-      console.error("Error fetching students:", error)
-      toast({
-        title: "خطأ",
-        description: "فشل في جلب بيانات الطلاب",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const handleChangeRecipientGroup = (value: string) => {
+    const nextGroup = value as RecipientGroup
+    setSelectedRecipientGroup(nextGroup)
+    setSelectedRecipients([])
+    setSelectedFilter("all")
+    setSearchTerm("")
+    setSendResults(null)
   }
 
   const handleSelectAll = () => {
-    const filteredIds = filteredStudents.map((student) => student.id)
-    const areAllFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedStudents.includes(id))
+    const filteredIds = filteredRecipients.map((recipient) => recipient.id)
+    const areAllFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedRecipients.includes(id))
 
     if (areAllFilteredSelected) {
-      setSelectedStudents((prev) => prev.filter((id) => !filteredIds.includes(id)))
+      setSelectedRecipients((prev) => prev.filter((id) => !filteredIds.includes(id)))
       return
     }
 
-    setSelectedStudents((prev) => Array.from(new Set([...prev, ...filteredIds])))
+    setSelectedRecipients((prev) => Array.from(new Set([...prev, ...filteredIds])))
   }
 
-  const handleSelectStudent = (studentId: string) => {
-    setSelectedStudents((prev) =>
-      prev.includes(studentId) ? prev.filter((id) => id !== studentId) : [...prev, studentId]
+  const handleSelectRecipient = (recipientId: string) => {
+    setSelectedRecipients((prev) =>
+      prev.includes(recipientId) ? prev.filter((id) => id !== recipientId) : [...prev, recipientId],
     )
   }
 
@@ -305,10 +407,10 @@ export default function WhatsAppSendPage() {
       return
     }
 
-    if (selectedStudents.length === 0) {
+    if (selectedRecipients.length === 0) {
       toast({
         title: "تنبيه",
-        description: "الرجاء اختيار طالب واحد على الأقل",
+        description: `الرجاء اختيار ${RECIPIENT_GROUP_LABELS[selectedRecipientGroup]} أولاً`,
         variant: "destructive",
       })
       return
@@ -326,7 +428,7 @@ export default function WhatsAppSendPage() {
     setIsSending(true)
     setSendResults(null)
 
-    const selectedStudentsData = students.filter((s) => selectedStudents.includes(s.id))
+    const selectedRecipientsData = currentRecipients.filter((recipient) => selectedRecipients.includes(recipient.id))
 
     try {
       const response = await fetch("/api/whatsapp/send", {
@@ -341,50 +443,47 @@ export default function WhatsAppSendPage() {
                 fileName: imagePayload.fileName,
               }
             : null,
-          recipients: selectedStudentsData.map((student) => ({
-            phoneNumber: student.guardian_phone,
-            message: resolveMessageTemplate(message, student),
+          recipients: selectedRecipientsData.map((recipient) => ({
+            phoneNumber: recipient.phoneNumber,
+            userId: recipient.id,
+            message: resolveMessageTemplate(message, recipient),
           })),
         }),
       })
 
       const data = await response.json().catch(() => ({}))
-
       if (!response.ok || !data.success) {
         throw new Error(data.error || "فشل في تجهيز رسائل واتساب")
       }
 
       const successCount = Number(data.queuedCount) || 0
       const failedCount = Number(data.failedCount) || 0
-
       setSendResults({ success: successCount, failed: failedCount })
-      setIsSending(false)
 
       if (successCount > 0) {
-      toast({
-        title: "تم تجهيز الرسائل",
-        description: `تم تجهيز ${successCount} رسالة واتساب${failedCount > 0 ? ` وتعذر تجهيز ${failedCount}` : ""}`,
-      })
-
-      // إعادة تعيين النموذج
-      setMessage("")
-      clearImageSelection()
-      setSelectedStudents([])
+        toast({
+          title: "تم تجهيز الرسائل",
+          description: `تم تجهيز ${successCount} رسالة واتساب${failedCount > 0 ? ` وتعذر تجهيز ${failedCount}` : ""}`,
+        })
+        setMessage("")
+        clearImageSelection()
+        setSelectedRecipients([])
       } else {
-      toast({
-        title: "فشل",
-        description: data.error || "لم يتم تجهيز أي رسالة للإرسال",
-        variant: "destructive",
-      })
+        toast({
+          title: "فشل",
+          description: data.error || "لم يتم تجهيز أي رسالة للإرسال",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      setIsSending(false)
       const offlineMessage = getOfflineErrorMessage(error)
       toast({
         title: offlineMessage || "فشل",
         description: offlineMessage || (error instanceof Error ? error.message : "حدث خطأ أثناء تجهيز رسائل واتساب"),
         variant: "destructive",
       })
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -396,17 +495,11 @@ export default function WhatsAppSendPage() {
     )
   }
 
-    if (authLoading || !authVerified) return (<div className="min-h-screen flex items-center justify-center bg-[#fafaf9]"><SiteLoader size="md" /></div>);
+  if (authLoading || !authVerified) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#fafaf9]"><SiteLoader size="md" /></div>
+  }
 
-  const halaqahOptions = Array.from(
-    new Set(
-      students
-        .map((student) => (student.halaqah || "").trim())
-        .filter(Boolean),
-    ),
-  ).sort((first, second) => first.localeCompare(second, "ar"))
-
-  const allFilteredSelected = filteredStudents.length > 0 && filteredStudents.every((student) => selectedStudents.includes(student.id))
+  const allFilteredSelected = filteredRecipients.length > 0 && filteredRecipients.every((recipient) => selectedRecipients.includes(recipient.id))
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -415,13 +508,13 @@ export default function WhatsAppSendPage() {
       <main className="flex-1 py-4 md:py-8 lg:py-12 px-3 md:px-4">
         <div className="container mx-auto max-w-[2200px] px-2 md:px-8 lg:px-16">
           <div className="space-y-6">
-            {/* Page Header */}
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold text-[#1a2332] mb-2 flex items-center gap-3">
                   <MessageCircle className="w-8 h-8 text-[#3453a7]" />
-                  الإرسال إلى أولياء الأمور
+                  إرسال عبر الواتس
                 </h1>
+                <p className="text-sm text-neutral-600">اختر الفئة المطلوبة ثم حدّد الأرقام وأرسل الرسالة عبر واتساب.</p>
               </div>
               <Button
                 variant="outline"
@@ -435,18 +528,11 @@ export default function WhatsAppSendPage() {
 
             {!isWhatsAppStatusLoading && !isWhatsAppReady ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-                واتساب غير مربوط حالياً. اربط الحساب أولاً من نافذة باركود الواتساب قبل إرسال الرسائل إلى أولياء الأمور.
+                واتساب غير مربوط حالياً. اربط الحساب أولاً من نافذة باركود الواتساب قبل إرسال الرسائل.
               </div>
             ) : null}
 
-            {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* تم حذف مربعي المحددون ومعهم واتساب */}
-            </div>
-
-            {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Message Composer */}
               <div className="lg:col-span-1">
                 <Card className="border-2 border-[#3453a7]/20">
                   <CardHeader>
@@ -466,7 +552,7 @@ export default function WhatsAppSendPage() {
                           <div className="space-y-3">
                             <div>
                               <p className="text-sm font-bold text-[#1a2332]">المتغيرات المتاحة</p>
-                              <p className="mt-1 text-xs text-gray-500">تُستبدل تلقائياً لكل طالب عند الإرسال.</p>
+                              <p className="mt-1 text-xs text-gray-500">تُستبدل تلقائياً حسب نوع المستلم المحدد.</p>
                             </div>
                             <div className="space-y-2">
                               {TEMPLATE_VARIABLES.map((variable) => (
@@ -492,7 +578,7 @@ export default function WhatsAppSendPage() {
                           type="text"
                           placeholder="اكتب نص لإضافته كرسالة جاهزة"
                           value={quickText}
-                          onChange={e => setQuickText(e.target.value)}
+                          onChange={(event) => setQuickText(event.target.value)}
                           className="text-xs w-2/3"
                         />
                         <Button
@@ -504,21 +590,20 @@ export default function WhatsAppSendPage() {
                           إضافة
                         </Button>
                       </div>
-                      {/* قائمة الرسائل الجاهزة */}
                       <div className="space-y-1 mb-2">
                         {isLoadingReady ? (
                           <div className="py-1"><SiteLoader /></div>
                         ) : readyMessages.length === 0 ? (
                           <div className="text-xs text-gray-400">لا توجد رسائل جاهزة</div>
                         ) : (
-                          readyMessages.map(msg => (
+                          readyMessages.map((msg) => (
                             <div key={msg.id} className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1">
                               <span className="flex-1 text-xs text-gray-700">{msg.text}</span>
                               <div className="flex gap-2">
-                                <Button type="button" size="sm" variant="outline" className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={()=>setMessage(prev=>prev?prev+"\n"+msg.text:msg.text)}>
+                                <Button type="button" size="sm" variant="outline" className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
                                   إدراج
                                 </Button>
-                                <Button type="button" size="sm" variant="outline" className="text-sm h-9 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={()=>handleDeleteReadyMessage(msg.id)}>
+                                <Button type="button" size="sm" variant="outline" className="text-sm h-9 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteReadyMessage(msg.id)}>
                                   حذف
                                 </Button>
                               </div>
@@ -530,7 +615,7 @@ export default function WhatsAppSendPage() {
                         id="message"
                         placeholder="اكتب رسالتك هنا...."
                         value={message}
-                        onChange={(e) => setMessage(e.target.value)}
+                        onChange={(event) => setMessage(event.target.value)}
                         rows={8}
                         className="resize-none"
                       />
@@ -578,126 +663,113 @@ export default function WhatsAppSendPage() {
 
                       {imagePayload ? (
                         <div className="overflow-hidden rounded-2xl border border-[#3453a7]/15 bg-white">
-                          <img
-                            src={imagePayload.previewUrl}
-                            alt="معاينة الصورة"
-                            className="h-56 w-full object-cover"
-                          />
+                          <img src={imagePayload.previewUrl} alt="معاينة الصورة" className="h-56 w-full object-cover" />
                         </div>
                       ) : null}
                     </div>
 
-                    {sendResults && (
+                    {sendResults ? (
                       <div className="space-y-2 rounded-lg bg-white p-4">
                         <h4 className="font-semibold text-[#1a2332]">نتائج الإرسال:</h4>
                         <div className="flex items-center gap-2 text-green-600">
                           <CheckCircle2 className="w-4 h-4" />
-                          <span>تم الإرسال إلى: {sendResults.success}</span>
+                          <span>تم التجهيز إلى: {sendResults.success}</span>
                         </div>
-                        {sendResults.failed > 0 && (
+                        {sendResults.failed > 0 ? (
                           <div className="flex items-center gap-2 text-red-600">
                             <XCircle className="w-4 h-4" />
                             <span>فشل: {sendResults.failed}</span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
-                    )}
+                    ) : null}
 
                     <Button
                       onClick={handleSendMessages}
-                      disabled={isSending || isWhatsAppStatusLoading || !isWhatsAppReady || selectedStudents.length === 0 || (!message.trim() && !imagePayload)}
+                      disabled={isSending || isWhatsAppStatusLoading || !isWhatsAppReady || selectedRecipients.length === 0 || (!message.trim() && !imagePayload)}
                       variant="outline"
                       className="w-full text-sm h-9 rounded-lg border-[#3453a7]/50 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] !text-white hover:brightness-105 hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60"
                     >
-                      {isSending ? (
-                        <>جاري الإرسال</>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 ml-2" />
-                          إرسال
-                        </>
-                      )}
+                      {isSending ? "جاري الإرسال" : <><Send className="w-4 h-4 ml-2" />إرسال</>}
                     </Button>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Students List */}
               <div className="lg:col-span-2">
                 <Card className="border-2 border-[#3453a7]/20">
                   <CardHeader>
-                    <CardTitle className="text-[#1a2332]">اختيار الطلاب</CardTitle>
-                    <CardDescription>حدد أولياء الأمور الذين تريد إرسال الرسالة لهم، ويمكنك التصفية حسب الحلقة</CardDescription>
+                    <CardTitle className="text-[#1a2332]">اختيار المستلمين</CardTitle>
+                    <CardDescription>اختر الفئة ثم حدّد الأرقام التي تريد الإرسال لها.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Search & Select All */}
-                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px_auto] gap-3">
-                      <div>
-                        <Input
-                          type="text"
-                          placeholder="بحث بالاسم أو رقم الهاتف أو الحلقة..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                      <Select value={selectedHalaqah} onValueChange={setSelectedHalaqah}>
+                    <div className="grid grid-cols-1 md:grid-cols-[220px_220px_minmax(0,1fr)_auto] gap-3">
+                      <Select value={selectedRecipientGroup} onValueChange={handleChangeRecipientGroup}>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="كل الحلقات" />
+                          <SelectValue placeholder="اختر الفئة" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">كل الحلقات</SelectItem>
-                          {halaqahOptions.map((halaqah) => (
-                            <SelectItem key={halaqah} value={halaqah}>
-                              {halaqah}
-                            </SelectItem>
+                          <SelectItem value="guardians">أولياء الأمور</SelectItem>
+                          <SelectItem value="teachers">المعلمين</SelectItem>
+                          <SelectItem value="admins">الإداريين</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={getRecipientFilterLabel(selectedRecipientGroup)} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{getRecipientFilterLabel(selectedRecipientGroup)}</SelectItem>
+                          {filterOptions.map((option) => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+
+                      <Input
+                        type="text"
+                        placeholder="بحث بالاسم أو رقم الهاتف أو رقم الحساب..."
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                      />
+
                       <Button
                         onClick={handleSelectAll}
                         variant="outline"
                         className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600 whitespace-nowrap"
                       >
-                        {allFilteredSelected
-                          ? "إلغاء تحديد الكل"
-                          : "تحديد الكل"}
+                        {allFilteredSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
                       </Button>
                     </div>
 
-                    {/* Students Grid */}
                     <div className="max-h-[600px] overflow-y-auto space-y-2">
-                      {filteredStudents.length === 0 ? (
+                      {filteredRecipients.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
                           <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                          <p>لا توجد نتائج</p>
+                          <p>لا توجد نتائج في {RECIPIENT_GROUP_LABELS[selectedRecipientGroup]}</p>
                         </div>
                       ) : (
-                        filteredStudents.map((student) => (
+                        filteredRecipients.map((recipient) => (
                           <label
-                            key={student.id}
-                            className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:border-[#3453a7] ${
-                              selectedStudents.includes(student.id)
-                                ? "border-[#3453a7] bg-[#3453a7]/5"
-                                : "border-gray-200"
-                            }`}
+                            key={recipient.id}
+                            className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:border-[#3453a7] ${selectedRecipients.includes(recipient.id) ? "border-[#3453a7] bg-[#3453a7]/5" : "border-gray-200"}`}
                           >
                             <input
                               type="checkbox"
-                              checked={selectedStudents.includes(student.id)}
-                              onChange={() => handleSelectStudent(student.id)}
+                              checked={selectedRecipients.includes(recipient.id)}
+                              onChange={() => handleSelectRecipient(recipient.id)}
                               className="w-5 h-5 text-[#3453a7] rounded"
                             />
                             <div className="flex-1">
-                              <p className="font-semibold text-[#1a2332]">{student.name}</p>
+                              <p className="font-semibold text-[#1a2332]">{recipient.name}</p>
                               <p className="text-sm text-gray-600 flex items-center gap-1">
                                 <Phone className="w-3 h-3" />
-                                {formatGuardianPhoneForDisplay(student.guardian_phone)}
+                                {formatGuardianPhoneForDisplay(recipient.phoneNumber)}
                               </p>
-                              <p className="mt-1 text-xs font-semibold text-[#3453a7]">
-                                {(student.halaqah || "بدون حلقة").trim() || "بدون حلقة"}
-                              </p>
+                              <p className="mt-1 text-xs font-semibold text-[#3453a7]">{getRecipientSecondaryLabel(recipient)}</p>
                             </div>
-                            <div className="text-sm text-gray-500">#{student.account_number}</div>
+                            <div className="text-sm text-gray-500">#{recipient.accountNumber || "-"}</div>
                           </label>
                         ))
                       )}
