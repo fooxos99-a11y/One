@@ -635,6 +635,7 @@ export default function StudentPlansPage() {
   const [resetDialogCircle, setResetDialogCircle] = useState<string | null>(null);
   const [isResetDialogLoading, setIsResetDialogLoading] = useState(false);
   const [resettingStudentId, setResettingStudentId] = useState<string | null>(null);
+  const [deletingPlanStudentId, setDeletingPlanStudentId] = useState<string | null>(null);
   const [memorizationEditorStudentId, setMemorizationEditorStudentId] = useState<string | null>(null);
   const [memorizationActionMsg, setMemorizationActionMsg] = useState<{ studentId: string; type: "success" | "error"; text: string } | null>(null);
 
@@ -1040,6 +1041,50 @@ export default function StudentPlansPage() {
       setStudentCompletedDays((prev) => ({ ...prev, [studentId]: data.completedDays || 0 }));
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const handleDeletePlan = async (student: Student) => {
+    const plan = studentPlans[student.id];
+    if (!plan || deletingPlanStudentId === student.id) {
+      return;
+    }
+
+    const confirmed = await confirmDialog({
+      title: "حذف الخطة",
+      description: `سيتم حذف خطة ${student.name} الحالية فقط، دون حذف المحفوظ السابق. هل تريد المتابعة؟`,
+      confirmText: "حذف الخطة",
+      cancelText: "إلغاء",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingPlanStudentId(student.id);
+      const res = await fetch(`/api/student-plans?student_id=${student.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "فشل في حذف الخطة");
+      }
+
+      setStudentPlans((prev) => ({ ...prev, [student.id]: null }));
+      setStudentProgress((prev) => ({ ...prev, [student.id]: 0 }));
+      setStudentCompletedDays((prev) => ({ ...prev, [student.id]: 0 }));
+
+      if (selectedStudent?.id === student.id) {
+        setAddDialogOpen(false);
+        setSelectedStudent(null);
+        setSaveMsg(null);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setDeletingPlanStudentId(null);
     }
   };
 
@@ -1644,6 +1689,16 @@ export default function StudentPlansPage() {
 
                         {/* أزرار */}
                         <div className="flex items-center gap-2 shrink-0">
+                          {plan && (
+                            <button
+                              onClick={() => handleDeletePlan(student)}
+                              disabled={deletingPlanStudentId === student.id}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              حذف الخطة
+                            </button>
+                          )}
                           <button
                             onClick={() => openAddDialog(student)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] border border-[#3453a7]/30 transition-colors"

@@ -99,6 +99,80 @@ async function clearPassedStudentExams(
   }
 }
 
+async function fallbackResetStudentMemorization(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  studentId: string,
+  semesterId: string,
+) {
+  const { error: planDeleteError } = await supabase
+    .from("student_plans")
+    .delete()
+    .eq("student_id", studentId)
+    .eq("semester_id", semesterId)
+
+  if (planDeleteError) {
+    throw planDeleteError
+  }
+
+  await clearPassedStudentExams(supabase, studentId, semesterId)
+
+  const { data, error } = await supabase
+    .from("students")
+    .update({
+      completed_juzs: [],
+      current_juzs: [],
+      memorized_start_surah: null,
+      memorized_start_verse: null,
+      memorized_end_surah: null,
+      memorized_end_verse: null,
+      memorized_ranges: null,
+    })
+    .eq("id", studentId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+async function fallbackRemoveStudentMemorizedRange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  studentId: string,
+  semesterId: string,
+  nextRanges: PreviousMemorizationRange[],
+  nextCompletedJuzs: number[],
+  nextCurrentJuzs: number[],
+  removedCompletedJuzs: number[],
+) {
+  const legacyFields = getLegacyPreviousMemorizationFields(nextRanges)
+
+  await clearPassedStudentExams(supabase, studentId, semesterId, removedCompletedJuzs)
+
+  const { data, error } = await supabase
+    .from("students")
+    .update({
+      memorized_start_surah: legacyFields.prev_start_surah,
+      memorized_start_verse: legacyFields.prev_start_verse,
+      memorized_end_surah: legacyFields.prev_end_surah,
+      memorized_end_verse: legacyFields.prev_end_verse,
+      memorized_ranges: nextRanges.length > 0 ? nextRanges : null,
+      completed_juzs: nextCompletedJuzs,
+      current_juzs: nextCurrentJuzs,
+    })
+    .eq("id", studentId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
 function mergeStudentPassedExamJuzs<T extends {
   completed_juzs?: number[] | null
   current_juzs?: number[] | null
@@ -342,6 +416,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const circleName = searchParams.get("circle")
     const accountNumber = searchParams.get("account_number")
+    const leaderboardMode = searchParams.get("leaderboard") === "1"
 
     console.log("[v0] GET /api/students - circle:", circleName, "account:", accountNumber)
 
@@ -363,7 +438,7 @@ export async function GET(request: Request) {
       query = query.eq("account_number", Number(accountNumber)) as typeof query
     } else if (circleName) {
       query = query.eq("halaqah", circleName.trim()) as typeof query
-    } else if (session && isTeacherRole(session.role)) {
+    } else if (!leaderboardMode && session && isTeacherRole(session.role)) {
       query = query.eq("halaqah", (session.halaqah || "").trim()) as typeof query
     }
 
@@ -434,7 +509,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "لا يمكنك الوصول إلى طلاب حلقة أخرى" }, { status: 403 })
     }
 
-    if (!session || (!accountNumber && !isPrivilegedRole(session.role) && !isTeacherRole(session.role))) {
+    if (leaderboardMode || !session || (!accountNumber && !isPrivilegedRole(session.role) && !isTeacherRole(session.role))) {
       studentsWithCircleName = studentsWithCircleName.map((student: any) => sanitizeStudentForPublic(student))
     }
 
@@ -521,7 +596,8 @@ export async function PATCH(request: Request) {
 
       if (error) {
         if (isMissingResetStudentMemorizationFunction(error)) {
-          return NextResponse.json({ error: "دالة إعادة الحفظ الذرية غير موجودة بعد. نفذ ملف scripts/053_create_reset_student_memorization_atomic.sql ثم أعد المحاولة." }, { status: 503 })
+          const fallbackData = await fallbackResetStudentMemorization(adminSupabase, studentId, activeSemester.id)
+          return NextResponse.json({ success: true, student: normalizeStudentMastery(fallbackData) }, { status: 200 })
         }
 
         console.error("[students] Error resetting memorized range atomically:", getSupabaseErrorMessage(error))
@@ -585,7 +661,21 @@ export async function PATCH(request: Request) {
 
       if (error) {
         if (isMissingRemoveStudentMemorizedRangeFunction(error)) {
-          return NextResponse.json({ error: "دالة حذف جزء من المحفوظ الذرية غير موجودة بعد. نفذ ملف scripts/054_create_remove_student_memorized_range_atomic.sql ثم أعد المحاولة." }, { status: 503 })
+          const fallbackData = await fallbackRemoveStudentMemorizedRange(
+            adminSupabase,
+            studentId,
+            activeSemester.id,
+            nextRanges,
+            nextCompletedJuzs,
+            nextCurrentJuzs,
+            removedCompletedJuzs,
+          )
+
+          return NextResponse.json({
+            success: true,
+            student: normalizeStudentMastery(fallbackData),
+            memorized_ranges: nextRanges,
+          }, { status: 200 })
         }
 
         console.error("[students] Error removing memorized range atomically:", getSupabaseErrorMessage(error))
