@@ -1898,7 +1898,7 @@ export function Header() {
                     {
                       icon: Send,
 
-                      label: "إرسال لأولياء الأمور",
+                      label: "إرسال عبر الواتس",
 
                       permKey: "الإرسال إلى أولياء الأمور",
 
