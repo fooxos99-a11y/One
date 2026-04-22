@@ -1602,6 +1602,8 @@ export function Header() {
                 >
                   {[
                     {
+                      icon: UserPlus,
+
                       label: "إضافة طالب",
 
                       permKey: "إضافة طالب",
