@@ -1033,7 +1033,7 @@ export default function AdminExamsPage() {
                   </div>
                 ) : studentScheduleRows.length > 0 ? (
                   <div className="overflow-x-auto rounded-[24px] border border-[#ebeff5]">
-                    <Table className="min-w-[880px]">
+                    <Table className="min-w-[680px] sm:min-w-[880px]">
                       <TableHeader>
                         <TableRow className="bg-[#f8fafc] hover:bg-[#f8fafc]">
                           <TableHead className="text-right font-black text-[#475569]">الطالب</TableHead>
@@ -1070,20 +1070,20 @@ export default function AdminExamsPage() {
                                   <div className="text-sm font-bold text-[#64748b]">لا يوجد محفوظ</div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="w-[148px] text-right sm:w-auto">
                                 <Input
                                   type="date"
                                   value={row.draftExamDate}
                                   onChange={(event) => updateScheduleDraft(row.student.id, { examDate: event.target.value })}
-                                  className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold disabled:cursor-not-allowed disabled:opacity-70"
+                                  className="h-11 w-[136px] rounded-2xl border-[#d7e3f2] bg-white px-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70 sm:w-full sm:text-base"
                                 />
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="w-[112px] text-right sm:w-auto">
                                 <Button
                                   type="button"
                                   onClick={() => handleSendScheduleNotification(row.student.id)}
                                   disabled={!hasAvailablePortions || isSending || cannotSend}
-                                  className="h-11 w-[132px] rounded-2xl bg-[#3453a7] px-5 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]/55 disabled:text-white disabled:opacity-100"
+                                  className="h-11 w-[92px] rounded-2xl bg-[#3453a7] px-3 text-xs font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]/55 disabled:text-white disabled:opacity-100 sm:w-[132px] sm:px-5 sm:text-sm"
                                 >
                                   {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : actionLabel}
                                 </Button>
@@ -1110,8 +1110,8 @@ export default function AdminExamsPage() {
           ) : null}
 
           <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
-            <DialogContent className="top-3 w-[calc(100vw-24px)] max-w-3xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
-              <div className="flex flex-col overflow-hidden rounded-[28px] bg-white">
+            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-3xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
+              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white sm:max-h-[90vh]">
                 <DialogHeader className="border-b border-[#e5edf6] px-4 py-4 sm:px-6 sm:py-5">
                   <DialogTitle className="flex items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
                     <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
@@ -1120,7 +1120,7 @@ export default function AdminExamsPage() {
                   <DialogDescription className="sr-only">نافذة اختيار الحلقة والطالب ثم تسجيل نتيجة الاختبار.</DialogDescription>
                 </DialogHeader>
 
-                <div className="px-4 py-5 sm:px-6 sm:py-6">
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 overscroll-contain sm:px-6 sm:py-6">
                   <div className="space-y-5">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2 text-right">
@@ -1212,13 +1212,15 @@ export default function AdminExamsPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col-reverse justify-end gap-3 border-t border-[#e5edf6] px-4 py-4 sm:flex-row sm:px-6">
+                <div className="shrink-0 border-t border-[#e5edf6] bg-white px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">
+                  <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
                   <Button type="button" variant="outline" onClick={() => setIsExamDialogOpen(false)} className="h-11 w-full rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff] sm:w-auto">
                     إغلاق
                   </Button>
                   <Button type="button" onClick={handleSaveExam} disabled={isSaving || isExamDialogLoading || tableMissing || !form.selectedJuz} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] sm:w-auto">
                     {isSaving ? "جاري الحفظ..." : "حفظ الاختبار"}
                   </Button>
+                  </div>
                 </div>
               </div>
             </DialogContent>
