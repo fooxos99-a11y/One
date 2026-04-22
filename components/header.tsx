@@ -1601,8 +1601,8 @@ export function Header() {
                   onToggle={() => setIsAdminStudentsOpen(!isAdminStudentsOpen)}
                 >
                   {[
-                    {
-                      icon: UserPlus,
+                      {[
+                        "إدارة الاختبارات", "اختبار الطلاب", "إدارة المسار", "إدارة المتجر", "الإشعارات", "الصلاحيات", "المالية", "الإرسال إلى أولياء الأمور", "إنهاء الفصل", "يوم السرد"].some(p => hasPermission(p)) && <div className="px-2 mb-0.5">
 
                       label: "إضافة طالب",
 
@@ -1828,11 +1828,21 @@ export function Header() {
                     {
                       icon: ClipboardCheck,
 
-                      label: "الاختبارات",
+                      label: "إدارة الاختبارات",
 
                       permKey: "إدارة الاختبارات",
 
                       path: "/admin/exams",
+                    },
+
+                    {
+                      icon: ClipboardCheck,
+
+                      label: "اختبار الطلاب",
+
+                      permKey: "اختبار الطلاب",
+
+                      path: "/admin/student-exams",
                     },
 
                     {
