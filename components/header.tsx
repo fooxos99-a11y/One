@@ -1842,7 +1842,7 @@ export function Header() {
 
                       permKey: "اختبار الطلاب",
 
-                      path: "/admin/student-exams",
+                      path: "?action=student-exams",
                     },
 
                     {
