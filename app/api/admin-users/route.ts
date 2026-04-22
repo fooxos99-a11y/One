@@ -265,6 +265,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "هذا الحساب الإداري ثابت ولا يمكن حذفه" }, { status: 403 })
     }
 
+    const { error: clearWhatsappMessagesError } = await supabase
+      .from("whatsapp_messages")
+      .update({ sent_by: null })
+      .eq("sent_by", id)
+
+    if (clearWhatsappMessagesError && clearWhatsappMessagesError.code !== "42P01") {
+      throw clearWhatsappMessagesError
+    }
+
     const { error } = await supabase.from("users").delete().eq("id", id)
     if (error) {
       throw error
