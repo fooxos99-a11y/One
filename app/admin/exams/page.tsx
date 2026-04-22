@@ -20,9 +20,9 @@ import { normalizeExamPortionSettings, type ExamPortionType } from "@/lib/exam-p
 import { getPassedPortionNumbers } from "@/lib/exam-portions"
 import type { PreviousMemorizationRange } from "@/lib/quran-data"
 import { DEFAULT_EXAM_PORTION_SETTINGS, DEFAULT_EXAM_SETTINGS, EXAM_PORTION_SETTINGS_ID, EXAM_SETTINGS_ID } from "@/lib/site-settings-constants"
-import { formatExamPortionLabel, getEligibleExamJuzs, getEligibleExamPortions, type StudentExamPlanProgressSource } from "@/lib/student-exams"
+import { formatExamPortionLabel, getEligibleExamPortions, type StudentExamPlanProgressSource } from "@/lib/student-exams"
 import { DEFAULT_EXAM_WHATSAPP_TEMPLATES, EXAM_WHATSAPP_SETTINGS_ID, normalizeExamWhatsAppTemplates, type ExamWhatsAppTemplates } from "@/lib/whatsapp-notification-templates"
-import { BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, ClipboardCheck, Loader2, Save, SlidersHorizontal, Trash2 } from "lucide-react"
+import { BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Loader2, Save, SlidersHorizontal, Trash2 } from "lucide-react"
 
 type Circle = {
   id: string
@@ -248,15 +248,12 @@ export default function AdminExamsPage() {
   const showAlert = useAlertDialog()
   const [isLoading, setIsLoading] = useState(true)
   const [isCircleDataLoading, setIsCircleDataLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [sendingScheduleStudentId, setSendingScheduleStudentId] = useState<string | null>(null)
   const [isCancellingScheduleId, setIsCancellingScheduleId] = useState<string | null>(null)
-  const [isExamDialogOpen, setIsExamDialogOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
   const [isSchedulesOverviewOpen, setIsSchedulesOverviewOpen] = useState(false)
-  const [isFailedExamActionDialogOpen, setIsFailedExamActionDialogOpen] = useState(false)
   const [tableMissing, setTableMissing] = useState(false)
   const [schedulesTableMissing, setSchedulesTableMissing] = useState(false)
   const [circles, setCircles] = useState<Circle[]>([])
@@ -268,31 +265,19 @@ export default function AdminExamsPage() {
   const [notificationTemplatesForm, setNotificationTemplatesForm] = useState<NotificationTemplatesForm>(DEFAULT_NOTIFICATION_TEMPLATES_FORM)
   const [portionMode, setPortionMode] = useState<ExamPortionType>(DEFAULT_EXAM_PORTION_SETTINGS.mode)
   const [selectedCircle, setSelectedCircle] = useState("")
-  const [examDialogCircle, setExamDialogCircle] = useState("")
-  const [form, setForm] = useState<ExamFormState>(DEFAULT_FORM)
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleExamForm>>({})
   const [studentPlanProgressMap, setStudentPlanProgressMap] = useState<Record<string, StudentPlanProgressState>>({})
-  const [examDialogStudents, setExamDialogStudents] = useState<Student[]>([])
-  const [examDialogExams, setExamDialogExams] = useState<ExamRow[]>([])
-  const [examDialogPlanProgressMap, setExamDialogPlanProgressMap] = useState<Record<string, StudentPlanProgressState>>({})
-  const [isExamDialogLoading, setIsExamDialogLoading] = useState(false)
   const [isSavingTemplates, setIsSavingTemplates] = useState(false)
   const [overviewCircleFilter, setOverviewCircleFilter] = useState<string>(ALL_CIRCLES_VALUE)
   const [overviewDateFilter, setOverviewDateFilter] = useState(getTodayDate())
   const [overviewPage, setOverviewPage] = useState(1)
   const [isOverviewSchedulesLoading, setIsOverviewSchedulesLoading] = useState(false)
   const [overviewSchedulesTableMissing, setOverviewSchedulesTableMissing] = useState(false)
-  const [failedExamActionForm, setFailedExamActionForm] = useState<FailedExamActionForm>(DEFAULT_FAILED_EXAM_ACTION_FORM)
 
   useEffect(() => {
     async function bootstrap() {
       if (authLoading || !authVerified) {
         return
-      }
-
-      const savedUserName = localStorage.getItem("userName") || ""
-      if (savedUserName) {
-        setForm((current) => (current.testedByName ? current : { ...current, testedByName: savedUserName }))
       }
 
       try {
@@ -330,14 +315,6 @@ export default function AdminExamsPage() {
   }, [authLoading, authVerified])
 
   useEffect(() => {
-    if (!isExamDialogOpen) {
-      return
-    }
-
-    setExamDialogCircle((current) => current || selectedCircle)
-  }, [isExamDialogOpen, selectedCircle])
-
-  useEffect(() => {
     async function loadStudentsAndExams() {
       if (authLoading || !authVerified) {
         return
@@ -350,7 +327,6 @@ export default function AdminExamsPage() {
         setScheduleDrafts({})
         setStudentPlanProgressMap({})
         setIsCircleDataLoading(false)
-        setForm((current) => ({ ...current, studentId: "", selectedJuz: "" }))
         return
       }
 
@@ -401,81 +377,9 @@ export default function AdminExamsPage() {
     void loadStudentsAndExams()
   }, [authLoading, authVerified, selectedCircle])
 
-  useEffect(() => {
-    async function loadExamDialogData() {
-      if (authLoading || !authVerified || !isExamDialogOpen) {
-        return
-      }
-
-      if (!examDialogCircle) {
-        setExamDialogStudents([])
-        setExamDialogExams([])
-        setExamDialogPlanProgressMap({})
-        setForm((current) => ({ ...current, studentId: "", selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))
-        setIsExamDialogLoading(false)
-        return
-      }
-
-      try {
-        setIsExamDialogLoading(true)
-        const [studentsResponse, examsResponse] = await Promise.all([
-          fetch(`/api/students?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
-          fetch(`/api/exams?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
-        ])
-
-        if (!studentsResponse.ok || !examsResponse.ok) {
-          throw new Error("تعذر تحميل بيانات نافذة الاختبار")
-        }
-
-        const studentsData = await studentsResponse.json()
-        const examsData = await examsResponse.json()
-        const loadedStudents = (studentsData.students || []) as Student[]
-        const ids = loadedStudents.map((student) => student.id).join(",")
-        const batchPlanResponse = loadedStudents.length > 0
-          ? await fetch(`/api/student-plans?student_ids=${encodeURIComponent(ids)}`, { cache: "no-store" })
-          : null
-        const batchPlanData = batchPlanResponse && batchPlanResponse.ok
-          ? await batchPlanResponse.json()
-          : { plansByStudent: {} }
-        const planEntries = loadedStudents.map((student) => ([
-          student.id,
-          {
-            plan: (batchPlanData.plansByStudent?.[student.id]?.plan || null) as StudentExamPlanProgressSource | null,
-            completedDays: Number(batchPlanData.plansByStudent?.[student.id]?.completedDays) || 0,
-          },
-        ] as const))
-
-        setExamDialogStudents(loadedStudents)
-        setExamDialogExams((examsData.exams || []) as ExamRow[])
-        setExamDialogPlanProgressMap(Object.fromEntries(planEntries))
-        setTableMissing(Boolean(examsData.tableMissing))
-        setForm((current) => {
-          const nextStudentId = loadedStudents.some((student) => student.id === current.studentId)
-            ? current.studentId
-            : (loadedStudents[0]?.id || "")
-
-          return {
-            ...current,
-            studentId: nextStudentId,
-          }
-        })
-      } catch (error) {
-        console.error("[admin-exams] load exam dialog:", error)
-        setExamDialogStudents([])
-        setExamDialogExams([])
-        setExamDialogPlanProgressMap({})
-      } finally {
-        setIsExamDialogLoading(false)
-      }
-    }
-
-    void loadExamDialogData()
-  }, [authLoading, authVerified, examDialogCircle, isExamDialogOpen])
-
   const settingsPreview = useMemo(() => fromSettingsForm(settingsForm), [settingsForm])
   const portionUnitLabel = portionMode === "hizb" ? "الحزب" : "الجزء"
   const filteredStudents = useMemo(() => students, [students])
-  const examDialogFilteredStudents = useMemo(() => examDialogStudents, [examDialogStudents])
   const activeSchedulesByStudentId = useMemo(() => {
     const grouped = new Map<string, ExamScheduleRow[]>()
 
@@ -491,20 +395,6 @@ export default function AdminExamsPage() {
 
     return grouped
   }, [examSchedules])
-  const selectedStudent = useMemo(() => examDialogFilteredStudents.find((student) => student.id === form.studentId) || null, [examDialogFilteredStudents, form.studentId])
-  const selectedStudentPlanProgress = useMemo(() => {
-    if (!form.studentId) {
-      return null
-    }
-
-    return examDialogPlanProgressMap[form.studentId] || null
-  }, [examDialogPlanProgressMap, form.studentId])
-  const studentExams = useMemo(() => examDialogExams.filter((exam) => exam.student_id === form.studentId), [examDialogExams, form.studentId])
-  const eligiblePortions = useMemo(() => getEligibleExamPortions(selectedStudent, selectedStudentPlanProgress, portionMode), [selectedStudent, selectedStudentPlanProgress, portionMode])
-  const eligiblePortionNumbers = useMemo(() => eligiblePortions.map((portion) => portion.portionNumber), [eligiblePortions])
-  const passedPortionNumbers = useMemo(() => getPassedPortionNumbers(studentExams, portionMode), [studentExams, portionMode])
-  const availablePortions = useMemo(() => eligiblePortions.filter((portion) => !passedPortionNumbers.has(portion.portionNumber)), [eligiblePortions, passedPortionNumbers])
-  const availableJuzs = useMemo(() => availablePortions.map((portion) => portion.portionNumber), [availablePortions])
   const studentScheduleRows = useMemo(() => {
     return filteredStudents.map((student) => {
       const studentPlanProgress = studentPlanProgressMap[student.id] || null
@@ -536,46 +426,6 @@ export default function AdminExamsPage() {
     () => calculateExamScore({ alerts: parseCount(form.alertsCount), mistakes: parseCount(form.mistakesCount) }, settingsPreview),
     [form.alertsCount, form.mistakesCount, settingsPreview],
   )
-
-  useEffect(() => {
-    if (!selectedStudent) {
-      setForm((current) => ({ ...current, selectedJuz: "" }))
-      return
-    }
-
-    setForm((current) => {
-      const canKeepSelectedJuz = current.selectedJuz && availableJuzs.includes(Number(current.selectedJuz))
-      if (canKeepSelectedJuz) {
-        return current
-      }
-
-      const nextJuz = availableJuzs[0]
-      return {
-        ...current,
-        selectedJuz: nextJuz ? String(nextJuz) : "",
-      }
-    })
-  }, [availableJuzs, selectedStudent])
-
-  useEffect(() => {
-    setForm((current) => {
-      const nextStudentId = examDialogFilteredStudents.some((student) => student.id === current.studentId)
-        ? current.studentId
-        : ""
-
-      if (nextStudentId === current.studentId) {
-        return current
-      }
-
-      return {
-        ...current,
-        studentId: nextStudentId,
-        selectedJuz: "",
-        alertsCount: "0",
-        mistakesCount: "0",
-      }
-    })
-  }, [examDialogFilteredStudents])
 
   const loadCircleSchedules = async (circleName: string) => {
     if (!circleName) {
@@ -743,140 +593,6 @@ export default function AdminExamsPage() {
     }
   }
 
-  const submitExam = async (failureAction?: FailedExamAction, retestDate?: string) => {
-    const selectedJuz = Number(form.selectedJuz)
-    const selectedPortion = eligiblePortions.find((portion) => portion.portionNumber === selectedJuz)
-
-    const response = await fetch("/api/exams", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        student_id: form.studentId,
-        exam_date: getTodayDate(),
-        portion_type: portionMode,
-        portion_number: selectedJuz,
-        exam_portion_label: selectedPortion?.label || formatExamPortionLabel(selectedJuz, "", portionMode),
-        tested_by_name: form.testedByName.trim(),
-        alerts_count: parseCount(form.alertsCount),
-        mistakes_count: parseCount(form.mistakesCount),
-        failure_action: failureAction,
-        retest_date: retestDate,
-      }),
-    })
-
-    const data = await response.json()
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || "تعذر حفظ الاختبار")
-    }
-
-    const finalScore = data.score?.finalScore ?? scorePreview.finalScore
-    const passed = Boolean(data.score?.passed)
-    const resetWarning = typeof data.resetWarning === "string" ? data.resetWarning : ""
-    const notificationWarning = typeof data.notificationWarning === "string" ? data.notificationWarning : ""
-    const scheduledRetest = Boolean(data.scheduledRetest)
-    const retestDateLabel = typeof data.retestDate === "string" ? data.retestDate : ""
-
-    if (passed) {
-      await showAlert(notificationWarning || `تم حفظ الاختبار بنتيجة ${finalScore} من ${settingsPreview.maxScore}`, notificationWarning ? "تنبيه" : "نجاح")
-    } else if (scheduledRetest) {
-      await showAlert(notificationWarning || resetWarning || `تم تسجيل الرسوب بنتيجة ${finalScore} من ${settingsPreview.maxScore}، وتم تحديد إعادة اختبار ${portionUnitLabel}${retestDateLabel ? ` بتاريخ ${retestDateLabel}` : ""}.`, "تنبيه")
-    } else if (data.requiresRememorization) {
-      await showAlert(notificationWarning || `تم تسجيل الرسوب بنتيجة ${finalScore} من ${settingsPreview.maxScore}، وتم تحويل هذا ${portionUnitLabel} إلى ${portionUnitLabel} يحتاج إعادة حفظ مع استمرار الخطة الحالية.`, "تنبيه")
-    } else {
-      await showAlert(notificationWarning || resetWarning || `تم تسجيل الرسوب بنتيجة ${finalScore} من ${settingsPreview.maxScore}.`, "تنبيه")
-    }
-
-    setForm((current) => ({
-      ...current,
-      alertsCount: "0",
-      mistakesCount: "0",
-    }))
-
-    const [studentsResponse, examsResponse] = await Promise.all([
-      fetch(`/api/students?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
-      fetch(`/api/exams?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
-    ])
-
-    const studentsData = await studentsResponse.json()
-    const examsData = await examsResponse.json()
-    const loadedStudents = (studentsData.students || []) as Student[]
-    const ids = loadedStudents.map((student) => student.id).join(",")
-    const batchPlanResponse = loadedStudents.length > 0
-      ? await fetch(`/api/student-plans?student_ids=${encodeURIComponent(ids)}`, { cache: "no-store" })
-      : null
-    const batchPlanData = batchPlanResponse && batchPlanResponse.ok
-      ? await batchPlanResponse.json()
-      : { plansByStudent: {} }
-    const planEntries = loadedStudents.map((student) => ([
-      student.id,
-      {
-        plan: (batchPlanData.plansByStudent?.[student.id]?.plan || null) as StudentExamPlanProgressSource | null,
-        completedDays: Number(batchPlanData.plansByStudent?.[student.id]?.completedDays) || 0,
-      },
-    ] as const))
-
-    setExamDialogStudents(loadedStudents)
-    setExamDialogExams((examsData.exams || []) as ExamRow[])
-    setTableMissing(Boolean(examsData.tableMissing))
-    setExamDialogPlanProgressMap(Object.fromEntries(planEntries))
-  }
-
-  const handleSaveExam = async () => {
-    if (!form.studentId) {
-      await showAlert("اختر الطالب أولاً", "تنبيه")
-      return
-    }
-
-    if (!form.selectedJuz) {
-      await showAlert(`اختر ${portionUnitLabel} المختبر من القائمة`, "تنبيه")
-      return
-    }
-
-    if (!form.testedByName.trim()) {
-      await showAlert("أدخل اسم المختبر أولاً", "تنبيه")
-      return
-    }
-
-    if (!scorePreview.passed) {
-      setFailedExamActionForm({
-        action: "retest",
-        retestDate: getTodayDate(),
-      })
-      setIsFailedExamActionDialogOpen(true)
-      return
-    }
-
-    try {
-      setIsSaving(true)
-      await submitExam()
-    } catch (error) {
-      console.error("[admin-exams] save:", error)
-      await showAlert(error instanceof Error ? error.message : "حدث خطأ أثناء حفظ الاختبار", "خطأ")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleConfirmFailedExamAction = async () => {
-    if (failedExamActionForm.action === "retest" && !failedExamActionForm.retestDate) {
-      await showAlert("اختر تاريخ إعادة الاختبار", "تنبيه")
-      return
-    }
-
-    try {
-      setIsSaving(true)
-      setIsFailedExamActionDialogOpen(false)
-      await submitExam(failedExamActionForm.action, failedExamActionForm.action === "retest" ? failedExamActionForm.retestDate : undefined)
-      setFailedExamActionForm(DEFAULT_FAILED_EXAM_ACTION_FORM)
-    } catch (error) {
-      console.error("[admin-exams] save failed action:", error)
-      await showAlert(error instanceof Error ? error.message : "حدث خطأ أثناء حفظ قرار الرسوب", "خطأ")
-      setIsFailedExamActionDialogOpen(true)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   const handleSendScheduleNotification = async (studentId: string) => {
     const targetStudent = studentScheduleRows.find((row) => row.student.id === studentId)
     if (!targetStudent) {
@@ -927,7 +643,7 @@ export default function AdminExamsPage() {
   }
 
   const handleCancelSchedule = async (scheduleId: string, studentIdOverride?: string) => {
-    const targetStudentId = studentIdOverride || form.studentId
+    const targetStudentId = studentIdOverride
 
     if (!targetStudentId) {
       return
@@ -984,11 +700,6 @@ export default function AdminExamsPage() {
             <Button type="button" onClick={() => setIsSchedulesOverviewOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
               <CalendarDays className="me-2 h-4 w-4" />
               المواعيد
-            </Button>
-
-            <Button type="button" onClick={() => setIsExamDialogOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
-              <ClipboardCheck className="me-2 h-4 w-4" />
-              اختبار الطلاب
             </Button>
 
             <Button type="button" onClick={() => setIsSettingsOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
@@ -1108,123 +819,6 @@ export default function AdminExamsPage() {
               جدول الاختبارات غير موجود بعد. شغّل ملف 042_create_student_exams.sql في قاعدة البيانات أولاً، ثم ستعمل الصفحة بشكل كامل.
             </div>
           ) : null}
-
-          <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
-            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-3xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
-              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white sm:max-h-[90vh]">
-                <DialogHeader className="border-b border-[#e5edf6] px-4 py-4 sm:px-6 sm:py-5">
-                  <DialogTitle className="flex items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
-                    <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
-                    اختبار الطلاب
-                  </DialogTitle>
-                  <DialogDescription className="sr-only">نافذة اختيار الحلقة والطالب ثم تسجيل نتيجة الاختبار.</DialogDescription>
-                </DialogHeader>
-
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 overscroll-contain sm:px-6 sm:py-6">
-                  <div className="space-y-5">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2 text-right">
-                        <Label className="text-sm font-black text-[#334155]">الحلقة</Label>
-                        <Select
-                          value={examDialogCircle}
-                          onValueChange={(value) => {
-                            setExamDialogCircle(value)
-                            setForm((current) => ({ ...current, studentId: "", selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))
-                          }}
-                          dir="rtl"
-                        >
-                          <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
-                            <SelectValue placeholder="اختر الحلقة" />
-                          </SelectTrigger>
-                          <SelectContent dir="rtl">
-                            {circles.map((circle) => (
-                              <SelectItem key={`exam-dialog-circle-${circle.id}`} value={circle.name}>{circle.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2 text-right">
-                        <Label className="text-sm font-black text-[#334155]">الطالب</Label>
-                        <Select
-                          key={examDialogCircle || "no-circle"}
-                          value={form.studentId || undefined}
-                          onValueChange={(value) => setForm((current) => ({ ...current, studentId: value, selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))}
-                          dir="rtl"
-                          disabled={!examDialogCircle || isExamDialogLoading || examDialogFilteredStudents.length === 0}
-                        >
-                          <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white disabled:cursor-not-allowed disabled:opacity-60">
-                            <SelectValue placeholder={examDialogCircle ? (isExamDialogLoading ? "جاري تحميل الطلاب" : examDialogFilteredStudents.length > 0 ? "اختر الطالب" : "لا يوجد طلاب") : "اختر الحلقة أولاً"} />
-                          </SelectTrigger>
-                          <SelectContent dir="rtl">
-                            {examDialogFilteredStudents.map((student) => (
-                              <SelectItem key={`exam-dialog-student-${student.id}`} value={student.id}>{student.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="rounded-[30px] border border-[#dbe5f1] bg-[#fcfdff] p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)] sm:p-6">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2 text-right">
-                          <Label className="text-sm font-black text-[#334155]">اسم المختبر</Label>
-                          <Input value={form.testedByName} onChange={(event) => setForm((current) => ({ ...current, testedByName: event.target.value }))} placeholder="اكتب اسم المختبر" className="h-12 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                        </div>
-
-                        <div className="space-y-2 text-right">
-                          <Label className="text-sm font-black text-[#334155]">{portionUnitLabel} المراد اختباره</Label>
-                          <Select key={form.studentId || "no-student"} value={form.selectedJuz || undefined} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl" disabled={!selectedStudent || isExamDialogLoading}>
-                            <SelectTrigger className="h-12 rounded-2xl border-[#d7e3f2] bg-white">
-                              <SelectValue placeholder={selectedStudent ? `اختر ${portionUnitLabel}` : "اختر الطالب أولاً"} />
-                            </SelectTrigger>
-                            <SelectContent dir="rtl">
-                              {availablePortions.map((portion) => (
-                                <SelectItem key={`${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2 text-right">
-                          <Label className="text-sm font-black text-[#334155]">عدد الأخطاء</Label>
-                          <Input type="number" min="0" value={form.mistakesCount} onChange={(event) => setForm((current) => ({ ...current, mistakesCount: event.target.value }))} className="h-12 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                        </div>
-
-                        <div className="space-y-2 text-right">
-                          <Label className="text-sm font-black text-[#334155]">عدد التنبيهات</Label>
-                          <Input type="number" min="0" value={form.alertsCount} onChange={(event) => setForm((current) => ({ ...current, alertsCount: event.target.value }))} className="h-12 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                        </div>
-                      </div>
-
-                      {selectedStudent && eligiblePortionNumbers.length > 0 && availableJuzs.length === 0 ? (
-                        <div className="mt-4 rounded-2xl bg-[#f8fbff] px-4 py-3 text-right text-sm font-bold text-[#20335f]">
-                          كل المحفوظ المتاح لهذا الطالب تم اختباره فيه بالفعل.
-                        </div>
-                      ) : null}
-
-                      {!selectedStudent && !isExamDialogLoading ? (
-                        <div className="mt-4 rounded-2xl border border-dashed border-[#d7e3f2] px-4 py-4 text-right text-sm font-bold text-[#64748b]">
-                          اختر الحلقة والطالب أولاً ليظهر {portionUnitLabel} المتاح للاختبار.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="shrink-0 border-t border-[#e5edf6] bg-white px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">
-                  <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-                  <Button type="button" variant="outline" onClick={() => setIsExamDialogOpen(false)} className="h-11 w-full rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff] sm:w-auto">
-                    إغلاق
-                  </Button>
-                  <Button type="button" onClick={handleSaveExam} disabled={isSaving || isExamDialogLoading || tableMissing || !form.selectedJuz} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] sm:w-auto">
-                    {isSaving ? "جاري الحفظ..." : "حفظ الاختبار"}
-                  </Button>
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
 
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-4xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
@@ -1447,56 +1041,6 @@ export default function AdminExamsPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isFailedExamActionDialogOpen} onOpenChange={setIsFailedExamActionDialogOpen}>
-            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
-              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white">
-                <DialogHeader className="border-b border-[#e5edf6] px-6 py-5">
-                  <DialogTitle className="flex w-full items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
-                    <CircleAlert className="h-5 w-5 text-[#3453a7]" />
-                    معالجة الرسوب
-                  </DialogTitle>
-                  <DialogDescription className="pt-2 text-right text-sm font-semibold leading-7 text-[#64748b]">
-                    الطالب راسب في هذا {portionUnitLabel}. هل تريد إعادة حفظه أم تجدوله على موعد آخر لإعادة اختباره؟
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-5 overflow-y-auto px-6 py-6">
-                  <div className="space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">ماذا تريد بعد الرسوب؟</Label>
-                    <Select value={failedExamActionForm.action} onValueChange={(value) => setFailedExamActionForm((current) => ({ ...current, action: value === "rememorize" ? "rememorize" : "retest" }))} dir="rtl">
-                      <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold">
-                        <SelectValue placeholder="اختر الإجراء" />
-                      </SelectTrigger>
-                      <SelectContent dir="rtl">
-                        <SelectItem value="retest">تحديد موعد آخر لإعادة الاختبار</SelectItem>
-                        <SelectItem value="rememorize">إعادة الحفظ</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {failedExamActionForm.action === "retest" ? (
-                    <div className="space-y-2 text-right">
-                      <Label className="text-sm font-black text-[#334155]">موعد إعادة الاختبار</Label>
-                      <Input type="date" value={failedExamActionForm.retestDate} onChange={(event) => setFailedExamActionForm((current) => ({ ...current, retestDate: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                    </div>
-                  ) : (
-                    <p className="text-right text-sm font-bold leading-7 text-[#dc2626]">
-                      عند اختيار إعادة الحفظ سيتم حذف هذا {portionUnitLabel} من المحفوظ الحالي، ولن يبقى محسوبًا ضمن الخطة الجارية، وسيظهر لاحقًا كجزء يحتاج إلى إتقان عند إضافة خطة جديدة للطالب.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-3 border-t border-[#e5edf6] px-6 py-4">
-                  <Button type="button" variant="outline" onClick={() => setIsFailedExamActionDialogOpen(false)} className="h-11 rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff]">
-                    إغلاق
-                  </Button>
-                  <Button type="button" onClick={handleConfirmFailedExamAction} disabled={isSaving} className="h-11 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]">
-                    {isSaving ? "جاري الحفظ..." : "حفظ فقط"}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
       </main>
       <Footer />
