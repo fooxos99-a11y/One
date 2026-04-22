@@ -274,6 +274,15 @@ export async function DELETE(request: Request) {
       throw clearWhatsappMessagesError
     }
 
+    const { error: clearWhatsappQuickMessagesError } = await supabase
+      .from("whatsapp_quick_messages")
+      .update({ created_by: null })
+      .eq("created_by", id)
+
+    if (clearWhatsappQuickMessagesError && clearWhatsappQuickMessagesError.code !== "42P01") {
+      throw clearWhatsappQuickMessagesError
+    }
+
     const { error } = await supabase.from("users").delete().eq("id", id)
     if (error) {
       throw error
