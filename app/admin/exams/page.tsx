@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -15,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { useAlertDialog } from "@/hooks/use-confirm-dialog"
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status"
-import { calculateExamScore, normalizeExamSettings, type ExamSettings } from "@/lib/exam-settings"
+import { normalizeExamSettings, type ExamSettings } from "@/lib/exam-settings"
 import { normalizeExamPortionSettings, type ExamPortionType } from "@/lib/exam-portion-settings"
 import { getPassedPortionNumbers } from "@/lib/exam-portions"
 import type { PreviousMemorizationRange } from "@/lib/quran-data"
@@ -62,15 +64,6 @@ type ExamRow = {
   students?: { name?: string | null; account_number?: number | null } | Array<{ name?: string | null; account_number?: number | null }> | null
 }
 
-type ExamFormState = {
-  studentId: string
-  examDate: string
-  selectedJuz: string
-  testedByName: string
-  alertsCount: string
-  mistakesCount: string
-}
-
 type SettingsForm = {
   maxScore: string
   alertDeduction: string
@@ -94,13 +87,6 @@ type StudentPlanProgressState = {
 type ScheduleExamForm = {
   juzNumber: string
   examDate: string
-}
-
-type FailedExamAction = "retest" | "rememorize"
-
-type FailedExamActionForm = {
-  action: FailedExamAction
-  retestDate: string
 }
 
 const ALL_CIRCLES_VALUE = "__all_circles__"
@@ -131,15 +117,6 @@ type ExamScheduleRow = {
   students?: { name?: string | null } | Array<{ name?: string | null }> | null
 }
 
-const DEFAULT_FORM: ExamFormState = {
-  studentId: "",
-  examDate: getTodayDate(),
-  selectedJuz: "",
-  testedByName: "",
-  alertsCount: "0",
-  mistakesCount: "0",
-}
-
 const DEFAULT_SETTINGS_FORM: SettingsForm = {
   maxScore: String(DEFAULT_EXAM_SETTINGS.maxScore),
   alertDeduction: String(DEFAULT_EXAM_SETTINGS.alertDeduction),
@@ -158,11 +135,6 @@ const DEFAULT_NOTIFICATION_TEMPLATES_FORM: NotificationTemplatesForm = {
 const DEFAULT_SCHEDULE_FORM: ScheduleExamForm = {
   juzNumber: "",
   examDate: getTodayDate(),
-}
-
-const DEFAULT_FAILED_EXAM_ACTION_FORM: FailedExamActionForm = {
-  action: "retest",
-  retestDate: getTodayDate(),
 }
 
 function toSettingsForm(settings: ExamSettings): SettingsForm {
@@ -195,15 +167,6 @@ function toNotificationTemplatesForm(templates: ExamWhatsAppTemplates): Notifica
 
 function fromNotificationTemplatesForm(form: NotificationTemplatesForm): ExamWhatsAppTemplates {
   return normalizeExamWhatsAppTemplates(form)
-}
-
-function parseCount(value: string) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return 0
-  }
-
-  return Math.floor(parsed)
 }
 
 function normalizeScheduleStudentRelation(value: ExamScheduleRow["students"]) {
@@ -422,11 +385,6 @@ export default function AdminExamsPage() {
       }
     })
   }, [activeSchedulesByStudentId, exams, filteredStudents, portionMode, scheduleDrafts, studentPlanProgressMap])
-  const scorePreview = useMemo(
-    () => calculateExamScore({ alerts: parseCount(form.alertsCount), mistakes: parseCount(form.mistakesCount) }, settingsPreview),
-    [form.alertsCount, form.mistakesCount, settingsPreview],
-  )
-
   const loadCircleSchedules = async (circleName: string) => {
     if (!circleName) {
       setExamSchedules([])
