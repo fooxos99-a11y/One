@@ -494,7 +494,25 @@ function MetricBar({
   );
 }
 
-function CircleIndicatorsCard({ items }: { items: CircleSummary[] }) {
+function CircleIndicatorsCard({
+  items,
+  dateFilter,
+  customRange,
+}: {
+  items: CircleSummary[];
+  dateFilter: DateFilter;
+  customRange: CustomDateRange;
+}) {
+  const buildStudentIndicatorsHref = (circleName: string) => {
+    const searchParams = new URLSearchParams({ filter: dateFilter });
+    if (dateFilter === "custom") {
+      searchParams.set("start", customRange.start);
+      searchParams.set("end", customRange.end);
+    }
+
+    return `/admin/statistics/circles/${encodeURIComponent(circleName)}/students?${searchParams.toString()}`;
+  };
+
   return (
     <section className="rounded-[24px] border border-[#e5e7eb] bg-white p-5 shadow-sm md:p-6">
       <div className="mb-5 flex items-center justify-between">
@@ -507,9 +525,10 @@ function CircleIndicatorsCard({ items }: { items: CircleSummary[] }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {items.length > 0 ? (
           items.map((item) => (
-            <div
+            <Link
               key={item.name}
-              className="space-y-3 rounded-[20px] border border-[#edf0f3] bg-[#fcfdff] p-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.45)]"
+              href={buildStudentIndicatorsHref(item.name)}
+              className="space-y-3 rounded-[20px] border border-[#edf0f3] bg-[#fcfdff] p-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.45)] transition hover:-translate-y-1 hover:border-[#d8deea] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.42)]"
             >
               <div className="text-right text-sm font-black text-[#1f2937]">{item.name}</div>
               <div className="space-y-2.5">
@@ -519,7 +538,7 @@ function CircleIndicatorsCard({ items }: { items: CircleSummary[] }) {
                 <MetricBar label={TEXT.revisedMetric} value={item.revisedPercent} trackClass="bg-[#dbeafe]" fillClass="bg-[#3b82f6]" />
                 <MetricBar label={TEXT.tiedMetric} value={item.tiedPercent} trackClass="bg-[#ede9fe]" fillClass="bg-[#8b5cf6]" />
               </div>
-            </div>
+            </Link>
           ))
         ) : (
           <EmptyState />
@@ -928,7 +947,7 @@ export default function StatisticsPage() {
                 </SectionShell>
               </section>
 
-              <CircleIndicatorsCard items={topCircles} />
+              <CircleIndicatorsCard items={topCircles} dateFilter={dateFilter} customRange={customRange} />
 
               <section className="space-y-3">
                 <div className="text-sm font-black text-[#1a2332]">{TEXT.browseCircles}</div>

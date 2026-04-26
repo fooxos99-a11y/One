@@ -12,6 +12,7 @@ import { GlobalBulkAddStudentDialog } from "./admin-modals/global-bulk-add-stude
 import { GlobalEditPointsDialog } from "./admin-modals/global-edit-points-dialog"
 import { GlobalEndSemesterDialog } from "./admin-modals/global-end-semester-dialog"
 import { GlobalStudentRecordsDialog } from "./admin-modals/global-student-records-dialog"
+import { GlobalStudentExamsDialog } from "./admin-modals/global-student-exams-dialog"
 
 function AdminModalsContent() {
   const pathname = usePathname()
@@ -31,6 +32,7 @@ function AdminModalsContent() {
       {action === 'transfer-student' && <GlobalMoveStudentDialog />}
       {action === 'edit-student' && <GlobalEditStudentDialog />}
       {action === 'edit-points' && <GlobalEditPointsDialog />}
+      {action === 'student-exams' && <GlobalStudentExamsDialog />}
       {action === 'end-semester' && <GlobalEndSemesterDialog />}
 
       

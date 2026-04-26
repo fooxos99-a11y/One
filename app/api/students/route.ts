@@ -22,6 +22,7 @@ import {
 } from "@/lib/quran-data"
 import { getOrCreateActiveSemester, isNoActiveSemesterError } from "@/lib/semesters"
 import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
+import { normalizeDigitsToEnglish } from "@/lib/number-format"
 
 function getSupabaseErrorMessage(error: unknown) {
   if (!error) return "حدث خطأ غير معروف";
@@ -422,7 +423,9 @@ export async function GET(request: Request) {
 
     let query = supabase.from("students").select("*")
 
-    if (accountNumber) {
+    if (leaderboardMode) {
+      // Leaderboards should always consider all circles, even for teacher sessions.
+    } else if (accountNumber) {
       if (!session) {
         return NextResponse.json({ error: "يجب تسجيل الدخول أولاً" }, { status: 401 })
       }
@@ -720,9 +723,9 @@ export async function PATCH(request: Request) {
     }
 
     if (phone_number !== undefined) updateData.phone_number = phone_number
-    if (id_number !== undefined) updateData.id_number = id_number
+    if (id_number !== undefined) updateData.id_number = normalizeDigitsToEnglish(String(id_number || "").trim()) || null
     if (account_number !== undefined) {
-      const normalizedAccountNumber = account_number === null || account_number === "" ? null : Number(account_number)
+      const normalizedAccountNumber = account_number === null || account_number === "" ? null : Number(normalizeDigitsToEnglish(String(account_number)))
 
       if (normalizedAccountNumber !== null && Number.isNaN(normalizedAccountNumber)) {
         return NextResponse.json({ error: "رقم الحساب غير صالح" }, { status: 400 })

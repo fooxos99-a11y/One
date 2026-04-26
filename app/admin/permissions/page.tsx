@@ -35,7 +35,6 @@ const PERMISSION_SECTIONS = [
     title: "إدارة الطلاب",
     items: [
       { key: "إدارة الطلاب", icon: Users },
-      { key: "إدارة الاختبارات", icon: ClipboardCheck },
     ],
   },
   {
@@ -60,6 +59,8 @@ const PERMISSION_SECTIONS = [
   {
     title: "الإدارة العامة",
     items: [
+      { key: "إدارة الاختبارات", icon: ClipboardCheck },
+      { key: "اختبار الطلاب", icon: ClipboardCheck },
       { key: "إدارة المسار", icon: Map },
       { key: "إدارة المتجر", icon: ShoppingBag },
       { key: "يوم السرد", icon: Archive },

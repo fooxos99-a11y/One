@@ -645,15 +645,7 @@ export default function TeacherManagement() {
                 {addDialogView === "bulk" ? (
                   <>
                     <div className="shrink-0 border-b border-[#3453a7]/15 bg-[#f8fbff] px-4 py-4 sm:px-6">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="space-y-1 text-right">
-                          <p className="text-sm font-bold text-[#1a2332]">إضافة مرتبة وسهلة</p>
-                          <p className="text-xs leading-6 text-neutral-500">جميع الصفوف داخل مساحة تمرير مستقلة، مع أزرار واضحة أعلى وأسفل النافذة.</p>
-                        </div>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                          <div className="inline-flex items-center justify-center rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[#3453a7] shadow-sm ring-1 ring-[#3453a7]/15">
-                            عدد الصفوف: {bulkTeachers.length}
-                          </div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                           <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#3453a7]/30 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
                             <Upload className="h-4 w-4" />
                             رفع إكسل
@@ -661,9 +653,8 @@ export default function TeacherManagement() {
                           </label>
                           <button type="button" onClick={addBulkTeacherRow} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#3453a7]/30 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
                             <Plus className="h-4 w-4" />
-                            إضافة صف
+                            أضف معلماً
                           </button>
-                        </div>
                       </div>
                     </div>
 

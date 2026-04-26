@@ -22,6 +22,7 @@ import { SiteLoader } from "@/components/ui/site-loader"
 import { isEvaluatedAttendance, translateAttendanceStatus } from "@/lib/student-attendance"
 import { getEligibleExamJuzs } from "@/lib/student-exams"
 import { useVerifiedRoleAccess } from "@/hooks/use-verified-role-access"
+import { normalizeDigitsToEnglish } from "@/lib/number-format"
 
 interface StudentData {
   id: string
@@ -86,6 +87,22 @@ interface RankingData {
   points: number
 }
 
+interface StudentIndicatorData {
+  id: string
+  name: string
+  circleName: string
+  memorized: number
+  revised: number
+  tied: number
+  percent: number
+  attendPercent: number
+  memorizedPercent: number
+  tikrarPercent: number
+  revisedPercent: number
+  tiedPercent: number
+  score: number
+}
+
 interface StudentExamRecord {
   id: string
   exam_portion_label: string
@@ -127,6 +144,8 @@ function ProfilePage() {
   const [isLoadingRecords, setIsLoadingRecords] = useState(false)
   const [studentExams, setStudentExams] = useState<StudentExamRecord[]>([])
   const [isLoadingExams, setIsLoadingExams] = useState(false)
+  const [studentIndicator, setStudentIndicator] = useState<StudentIndicatorData | null>(null)
+  const [isLoadingIndicator, setIsLoadingIndicator] = useState(false)
   const [rankingData, setRankingData] = useState<RankingData | null>(null)
   const [planData, setPlanData] = useState<any>(null)
   const [planCompletedDays, setPlanCompletedDays] = useState(0)
@@ -144,6 +163,14 @@ function ProfilePage() {
     if (!user) return
     void fetchStudentData(user.accountNumber)
   }, [user])
+
+  useEffect(() => {
+    if (!studentData?.id) {
+      return
+    }
+
+    void fetchStudentIndicator()
+  }, [studentData?.id])
 
   useEffect(() => {
     const handleThemeChanged = () => {
@@ -231,6 +258,49 @@ function ProfilePage() {
     } catch (e) {
       console.error("[profile] Error fetching achievements:", e)
     }
+  }
+
+  const fetchStudentIndicator = async () => {
+    try {
+      setIsLoadingIndicator(true)
+      const response = await fetch("/api/statistics/my-indicator?filter=currentMonth", { cache: "no-store" })
+      const data = await response.json()
+      setStudentIndicator(data.indicator || null)
+    } catch (error) {
+      console.error("[profile] Error fetching student indicator:", error)
+      setStudentIndicator(null)
+    } finally {
+      setIsLoadingIndicator(false)
+    }
+  }
+
+  const formatPercent = (value: number) => `${new Intl.NumberFormat("ar-SA", {
+    minimumFractionDigits: value >= 10 ? 0 : 1,
+    maximumFractionDigits: 1,
+  }).format(Math.max(0, Math.min(100, value)))}%`
+
+  const MetricBar = ({
+    label,
+    value,
+    trackClass,
+    fillClass,
+  }: {
+    label: string
+    value: number
+    trackClass: string
+    fillClass: string
+  }) => {
+    const safeValue = Math.max(0, Math.min(100, value))
+
+    return (
+      <div className="grid grid-cols-[64px_minmax(0,1fr)_72px] items-center gap-3 text-xs font-bold text-[#5f6b7a]">
+        <span className="text-left tabular-nums text-[#4c5a6a]">{formatPercent(safeValue)}</span>
+        <div className={`h-2.5 overflow-hidden rounded-full ${trackClass}`}>
+          <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${safeValue}%` }} />
+        </div>
+        <span className="text-right whitespace-nowrap">{label}</span>
+      </div>
+    )
   }
 
   const renderAchievementIcon = (type: string, cls = "w-5 h-5") => {
@@ -480,11 +550,12 @@ function ProfilePage() {
               <div className="px-4 py-2 border-b border-[#3453a7]/20 bg-gradient-to-r from-[#3453a7]/10 to-transparent">
                 <span className="text-sm font-bold text-[#1a2332]">البيانات</span>
               </div>
-              <div className="grid grid-cols-5 divide-x divide-x-reverse divide-[#3453a7]/15 border-b border-[#3453a7]/15">
+              <div className="grid grid-cols-6 divide-x divide-x-reverse divide-[#3453a7]/15 border-b border-[#3453a7]/15">
                   {[
                     { value: "profile",      icon: <User       className="w-5 h-5" />, label: "الملف"      },
                     { value: "achievements", icon: <Award      className="w-5 h-5" />, label: "الإنجازات"  },
                     { value: "records",      icon: <BarChart3  className="w-5 h-5" />, label: "السجلات"    },
+                    { value: "indicators",   icon: <Trophy     className="w-5 h-5" />, label: "مؤشري"     },
                     { value: "plan",         icon: <BookMarked className="w-5 h-5" />, label: "الخطة"      },
                     { value: "archive",      icon: <Library className="w-5 h-5" />, label: "المحفوظ"    },
                   ].map((item) => (
@@ -515,8 +586,8 @@ function ProfilePage() {
                     <div className="grid grid-cols-2 gap-3 pb-4 md:pb-6 border-b-2 border-[#3453a7]/20">
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-[#1a2332]/60">رقم الحساب</label>
-                        <div className="p-3 bg-white rounded-xl text-base font-extrabold text-[#1a2332] tracking-wide border border-[#3453a7]/20">
-                          {studentData.account_number}
+                        <div className="p-3 bg-white rounded-xl text-base font-extrabold text-[#1a2332] tracking-wide border border-[#3453a7]/20" dir="ltr">
+                          {normalizeDigitsToEnglish(studentData.account_number)}
                         </div>
                       </div>
                       <div className="space-y-1">
@@ -533,8 +604,8 @@ function ProfilePage() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-[#1a2332]/60">رقم الهوية</label>
-                        <div className="p-3 bg-white rounded-xl text-base font-extrabold text-[#1a2332] tracking-wide border border-[#3453a7]/20">
-                          {studentData.id_number || "غير محدد"}
+                        <div className="p-3 bg-white rounded-xl text-base font-extrabold text-[#1a2332] tracking-wide border border-[#3453a7]/20" dir="ltr">
+                          {studentData.id_number ? normalizeDigitsToEnglish(studentData.id_number) : "غير محدد"}
                         </div>
                       </div>
                       {studentData.guardian_phone && (
@@ -703,6 +774,47 @@ function ProfilePage() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="indicators" className="space-y-4 md:space-y-6">
+                <Card className="rounded-none border-0 shadow-none">
+                  <CardHeader className="bg-white p-4 md:p-6">
+                    <CardTitle className="text-xl md:text-2xl text-[#1a2332]">مؤشري لهذا الشهر</CardTitle>
+                    <CardDescription className="text-sm font-semibold text-[#5b6472]">
+                      تظهر هنا بطاقة أدائك الخاصة بك فقط
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-2 md:pt-3 space-y-4 md:space-y-6">
+                    {isLoadingIndicator ? (
+                      <div className="flex justify-center py-12">
+                        <SiteLoader size="md" color="#3453a7" />
+                      </div>
+                    ) : !studentIndicator ? (
+                      <div className="text-center py-12">
+                        <Trophy className="w-24 h-24 mx-auto mb-4 opacity-40" style={{ color: "#3453a7" }} />
+                        <p className="text-2xl font-bold text-[#4f73d1] mb-2">لا توجد بيانات مؤشر حالياً</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 rounded-[24px] border border-[#e5e7eb] bg-white p-5 shadow-sm md:p-6">
+                        <div className="flex flex-col gap-3 border-b border-[#edf0f3] pb-4 md:flex-row md:items-center md:justify-between">
+                          <div className="text-right">
+                            <div className="text-lg font-black text-[#1f2937]">{studentIndicator.name}</div>
+                            <div className="mt-1 text-sm font-bold text-[#667085]">{studentIndicator.circleName}</div>
+                          </div>
+                          <div className="inline-flex rounded-full bg-[#eef2ff] px-4 py-2 text-sm font-black text-[#4f46e5]">
+                            المؤشر العام: {formatPercent(studentIndicator.score)}
+                          </div>
+                        </div>
+                        <div className="space-y-2.5">
+                          <MetricBar label="الحضور" value={studentIndicator.attendPercent} trackClass="bg-[#fff3bf]" fillClass="bg-[#facc15]" />
+                          <MetricBar label="التسميع" value={studentIndicator.memorizedPercent} trackClass="bg-[#dcfce7]" fillClass="bg-[#22c55e]" />
+                          <MetricBar label="التكرار" value={studentIndicator.tikrarPercent} trackClass="bg-[#d1fae5]" fillClass="bg-[#10b981]" />
+                          <MetricBar label="المراجعة" value={studentIndicator.revisedPercent} trackClass="bg-[#dbeafe]" fillClass="bg-[#3b82f6]" />
+                          <MetricBar label="الربط" value={studentIndicator.tiedPercent} trackClass="bg-[#ede9fe]" fillClass="bg-[#8b5cf6]" />
+                        </div>
                       </div>
                     )}
                   </CardContent>

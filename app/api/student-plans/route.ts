@@ -7,6 +7,7 @@ import {
   calculatePreviousMemorizedPages,
   getContiguousCompletedJuzRange,
   getAdjustedPlanPreviewRange,
+  getJuzCoverageFromRanges,
   getStoredMemorizedRanges,
   getLegacyPreviousMemorizationFields,
   getJuzBounds,
@@ -287,6 +288,39 @@ function resolveSurahNumber(value: unknown) {
 function isMissingStudentExamsTable(error: unknown) {
   const message = String((error as { message?: string } | null)?.message || error || "")
   return /student_exams/i.test(message) && /does not exist|not exist|relation|table/i.test(message)
+}
+
+async function clearPassedStudentExams(
+  supabase: Awaited<ReturnType<typeof createAdminClient>>,
+  studentId: string,
+  semesterId: string,
+  juzNumbers?: number[],
+) {
+  try {
+    let query = supabase
+      .from("student_exams")
+      .delete()
+      .eq("student_id", studentId)
+      .eq("semester_id", semesterId)
+      .eq("passed", true)
+
+    if (Array.isArray(juzNumbers)) {
+      if (juzNumbers.length === 0) {
+        return
+      }
+
+      query = query.in("juz_number", juzNumbers)
+    }
+
+    const { error } = await query
+    if (error && !isMissingStudentExamsTable(error)) {
+      throw error
+    }
+  } catch (error) {
+    if (!isMissingStudentExamsTable(error)) {
+      throw error
+    }
+  }
 }
 
 function mergePassedExamJuzsIntoSnapshot(
@@ -1181,7 +1215,7 @@ export async function DELETE(request: Request) {
     if (planId) {
       const { data: plan, error: planError } = await supabase
         .from("student_plans")
-        .select("student_id")
+        .select("student_id, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges")
         .eq("id", planId)
         .maybeSingle()
 
@@ -1198,9 +1232,83 @@ export async function DELETE(request: Request) {
         return studentAccess.response
       }
 
+      const { data: studentSnapshot, error: studentSnapshotError } = await supabase
+        .from("students")
+        .select("completed_juzs")
+        .eq("id", plan.student_id)
+        .single()
+
+      if (studentSnapshotError) {
+        throw studentSnapshotError
+      }
+
+      const previousRanges = normalizePreviousMemorizationRanges(plan.previous_memorization_ranges)
+      const fallbackPreviousRanges = previousRanges.length > 0
+        ? previousRanges
+        : (plan.has_previous && plan.prev_start_surah && plan.prev_end_surah
+            ? [{
+                startSurahNumber: plan.prev_start_surah,
+                startVerseNumber: plan.prev_start_verse || 1,
+                endSurahNumber: plan.prev_end_surah,
+                endVerseNumber: plan.prev_end_verse || SURAHS.find((surah) => surah.number === plan.prev_end_surah)?.verseCount || 1,
+              }]
+            : [])
+
+      const previousLegacyFields = getLegacyPreviousMemorizationFields(fallbackPreviousRanges)
+      const previousCoverage = getJuzCoverageFromRanges(fallbackPreviousRanges)
+      const previousCompletedJuzs = Array.from(previousCoverage.completedJuzs).sort((left, right) => left - right)
+      const previousCurrentJuzs = Array.from(previousCoverage.currentJuzs).sort((left, right) => left - right)
+      const removedCompletedJuzs = getNormalizedCompletedJuzs(studentSnapshot?.completed_juzs)
+        .filter((juzNumber) => !previousCompletedJuzs.includes(juzNumber))
+
+      if (removedCompletedJuzs.length > 0) {
+        await clearPassedStudentExams(supabase, plan.student_id, activeSemester.id, removedCompletedJuzs)
+      }
+
+      const { data: updatedStudent, error: studentUpdateError } = await supabase
+        .from("students")
+        .update({
+          memorized_start_surah: previousLegacyFields.prev_start_surah,
+          memorized_start_verse: previousLegacyFields.prev_start_verse,
+          memorized_end_surah: previousLegacyFields.prev_end_surah,
+          memorized_end_verse: previousLegacyFields.prev_end_verse,
+          memorized_ranges: fallbackPreviousRanges.length > 0 ? fallbackPreviousRanges : null,
+          completed_juzs: previousCompletedJuzs,
+          current_juzs: previousCurrentJuzs,
+        })
+        .eq("id", plan.student_id)
+        .select()
+        .single()
+
+      if (studentUpdateError) {
+        throw studentUpdateError
+      }
+
       const { error } = await supabase.from("student_plans").delete().eq("id", planId)
       if (error) throw error
+
+      return NextResponse.json({ success: true, student: updatedStudent })
     } else if (studentId) {
+      const { data: latestPlan, error: latestPlanError } = await supabase
+        .from("student_plans")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("semester_id", activeSemester.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestPlanError) {
+        throw latestPlanError
+      }
+
+      if (latestPlan?.id) {
+        const forwardedUrl = new URL(request.url)
+        forwardedUrl.searchParams.delete("student_id")
+        forwardedUrl.searchParams.set("plan_id", latestPlan.id)
+        return DELETE(new Request(forwardedUrl.toString(), { method: "DELETE", headers: request.headers }))
+      }
+
       const studentAccess = await ensureStudentAccess(supabase, session, studentId)
       if ("response" in studentAccess) {
         return studentAccess.response

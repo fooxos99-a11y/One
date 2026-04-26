@@ -220,10 +220,21 @@ export default function StudentDailyAttendancePage() {
     return selectedDate > getSaudiDate();
   })();
 
-  const sorted = [...filteredRecords].sort((a, b) => {
-    const order: Record<string, number> = { absent: 0, excused: 1, late: 2, present: 3 };
-    return (order[a.status ?? ""] ?? 3) - (order[b.status ?? ""] ?? 3);
-  });
+  const arabicCollator = new Intl.Collator("ar", { numeric: true, sensitivity: "base" })
+  const groupedRecords = Array.from(
+    filteredRecords.reduce<Map<string, AttendanceRecord[]>>((groups, record) => {
+      const circleName = (record.halaqah || "بدون حلقة").trim() || "بدون حلقة"
+      const currentGroup = groups.get(circleName) || []
+      currentGroup.push(record)
+      groups.set(circleName, currentGroup)
+      return groups
+    }, new Map()),
+  )
+    .sort(([leftCircle], [rightCircle]) => arabicCollator.compare(leftCircle, rightCircle))
+    .map(([circleName, records]) => ({
+      circleName,
+      records: records.slice().sort((left, right) => arabicCollator.compare(left.student_name || "", right.student_name || "")),
+    }))
 
   const availableCircles = Array.from(
     new Set(
@@ -322,43 +333,54 @@ export default function StudentDailyAttendancePage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ) : sorted.length > 0 ? sorted.map((record, i) => (
-                      <TableRow
-                        key={record.id}
-                        className="transition-colors duration-150 hover:bg-white border-b border-[#3453a7]/10"
-                        style={{ animationDelay: `${i * 30}ms` }}
-                      >
-                        <TableCell className="font-medium text-neutral-600 text-base">{record.halaqah || "—"}</TableCell>
-                        <TableCell className="font-semibold text-[#1a2332] text-base">{record.student_name}</TableCell>
-                        <TableCell className="text-center">
-                          {isNonEvaluatedAttendance(record.status)
-                            ? <span className="text-gray-300">—</span>
-                            : <EvaluationCell level={record.hafiz_level} detail={formatReadingRange(record.hafiz_from_surah, record.hafiz_from_verse, record.hafiz_to_surah, record.hafiz_to_verse)} />}
-                        </TableCell>
-                        <TableCell className="text-center px-1">
-                          {isNonEvaluatedAttendance(record.status)
-                            ? <span className="text-gray-300">—</span>
-                            : <LevelBadge level={record.tikrar_level} />}
-                        </TableCell>
-                        <TableCell className="text-center px-1">
-                          {isNonEvaluatedAttendance(record.status)
-                            ? <span className="text-gray-300">—</span>
-                            : <EvaluationCell level={record.samaa_level} detail={formatReadingRange(record.samaa_from_surah, record.samaa_from_verse, record.samaa_to_surah, record.samaa_to_verse)} />}
-                        </TableCell>
-                        <TableCell className="text-center px-1">
-                          {isNonEvaluatedAttendance(record.status)
-                            ? <span className="text-gray-300">—</span>
-                            : <EvaluationCell level={record.rabet_level} detail={formatReadingRange(record.rabet_from_surah, record.rabet_from_verse, record.rabet_to_surah, record.rabet_to_verse)} />}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <StatusBadge status={record.status} />
-                        </TableCell>
-                        <TableCell className="text-center text-base max-w-[200px]">
-                          {record.notes
-                            ? <span className="text-neutral-600">{record.notes}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </TableCell>
-                      </TableRow>
+                    ) : groupedRecords.length > 0 ? groupedRecords.map((group, groupIndex) => (
+                      group.records.map((record, recordIndex) => (
+                        <TableRow
+                          key={record.id}
+                          className="transition-colors duration-150 hover:bg-white border-b border-[#3453a7]/10"
+                          style={{ animationDelay: `${(groupIndex * 40) + (recordIndex * 20)}ms` }}
+                        >
+                          {recordIndex === 0 ? (
+                            <TableCell rowSpan={group.records.length} className="min-w-[170px] border-s border-[#3453a7]/10 align-top font-medium text-neutral-700 text-base bg-[#fafcff]">
+                              <div className="flex items-start gap-2">
+                                <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[#3453a7]/10 px-2 text-sm font-bold text-[#3453a7]">
+                                  {groupIndex + 1}
+                                </span>
+                                <span className="pt-0.5 font-semibold">{group.circleName}</span>
+                              </div>
+                            </TableCell>
+                          ) : null}
+                          <TableCell className="font-semibold text-[#1a2332] text-base">{record.student_name}</TableCell>
+                          <TableCell className="text-center">
+                            {isNonEvaluatedAttendance(record.status)
+                              ? <span className="text-gray-300">—</span>
+                              : <EvaluationCell level={record.hafiz_level} detail={formatReadingRange(record.hafiz_from_surah, record.hafiz_from_verse, record.hafiz_to_surah, record.hafiz_to_verse)} />}
+                          </TableCell>
+                          <TableCell className="text-center px-1">
+                            {isNonEvaluatedAttendance(record.status)
+                              ? <span className="text-gray-300">—</span>
+                              : <LevelBadge level={record.tikrar_level} />}
+                          </TableCell>
+                          <TableCell className="text-center px-1">
+                            {isNonEvaluatedAttendance(record.status)
+                              ? <span className="text-gray-300">—</span>
+                              : <EvaluationCell level={record.samaa_level} detail={formatReadingRange(record.samaa_from_surah, record.samaa_from_verse, record.samaa_to_surah, record.samaa_to_verse)} />}
+                          </TableCell>
+                          <TableCell className="text-center px-1">
+                            {isNonEvaluatedAttendance(record.status)
+                              ? <span className="text-gray-300">—</span>
+                              : <EvaluationCell level={record.rabet_level} detail={formatReadingRange(record.rabet_from_surah, record.rabet_from_verse, record.rabet_to_surah, record.rabet_to_verse)} />}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <StatusBadge status={record.status} />
+                          </TableCell>
+                          <TableCell className="text-center text-base max-w-[200px]">
+                            {record.notes
+                              ? <span className="text-neutral-600">{record.notes}</span>
+                              : <span className="text-gray-300">—</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )) : (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-12 text-gray-400">

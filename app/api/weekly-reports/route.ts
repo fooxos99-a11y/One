@@ -83,6 +83,10 @@ type StudentCardData = {
   totalActivity: number
 }
 
+function normalizeCircleName(value?: string | null) {
+  return String(value || "").trim().toLowerCase()
+}
+
 function formatDateForQuery(value: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(value)
 }
@@ -223,6 +227,7 @@ export async function GET(request: Request) {
     const { session } = auth
     const { searchParams } = new URL(request.url)
     const circleName = String(searchParams.get("circle") || "").trim()
+    const normalizedCircleName = normalizeCircleName(circleName)
     const weekOffset = Math.max(0, Number.parseInt(String(searchParams.get("weekOffset") || "0"), 10) || 0)
 
     if (!circleName) {
@@ -260,14 +265,14 @@ export async function GET(request: Request) {
     const studentsResult = await supabase
       .from("students")
       .select("id, name, halaqah, id_number, account_number, points")
-      .eq("halaqah", circleName)
       .order("points", { ascending: false })
 
     if (studentsResult.error) {
       throw studentsResult.error
     }
 
-    const studentRows = (studentsResult.data ?? []) as StudentRow[]
+    const studentRows = ((studentsResult.data ?? []) as StudentRow[])
+      .filter((student) => normalizeCircleName(student.halaqah) === normalizedCircleName)
     const studentIds = studentRows.map((student) => student.id).filter(Boolean)
 
     if (studentIds.length === 0) {
@@ -284,18 +289,17 @@ export async function GET(request: Request) {
       .select(`
         id,
         student_id,
+        halaqah,
         date,
         status,
         evaluations (hafiz_level, tikrar_level, samaa_level, rabet_level)
       `)
-      .eq("halaqah", circleName)
       .gte("date", studyWeek.startDate)
       .lte("date", studyWeek.endDate)
 
     let previousWeekAttendanceQuery = supabase
       .from("attendance_records")
-      .select("id", { count: "exact", head: true })
-      .eq("halaqah", circleName)
+      .select("id, halaqah")
       .gte("date", previousWeek.startDate)
       .lte("date", previousWeek.endDate)
 
@@ -324,7 +328,12 @@ export async function GET(request: Request) {
     }
 
     const plans = (plansResult.data ?? []) as PlanRow[]
-    const attendanceRows = ((attendanceResult.data ?? []) as AttendanceRow[]).filter((record) => studyDates.includes(record.date))
+    const attendanceRows = ((attendanceResult.data ?? []) as AttendanceRow[]).filter(
+      (record) => studyDates.includes(record.date) && normalizeCircleName(record.halaqah) === normalizedCircleName,
+    )
+    const previousWeekAttendanceCount = ((previousWeekAttendanceResult.data ?? []) as Array<{ id: string; halaqah: string | null }>)
+      .filter((record) => normalizeCircleName(record.halaqah) === normalizedCircleName)
+      .length
     let dailyReports: DailyReportRow[] = []
     let previousWeekReportsCount = 0
 
@@ -483,7 +492,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       students: cardRows,
-      hasPreviousWeek: (previousWeekAttendanceResult.count ?? 0) > 0 || previousWeekReportsCount > 0,
+      hasPreviousWeek: previousWeekAttendanceCount > 0 || previousWeekReportsCount > 0,
       error: "",
     })
   } catch (error) {

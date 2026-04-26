@@ -14,6 +14,11 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { useAdminAuth } from "@/hooks/use-admin-auth"
+import {
+  DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES,
+  fillEnrollmentNotificationTemplate,
+  type EnrollmentNotificationTemplates,
+} from "@/lib/enrollment-notification-templates"
 import { getContiguousCompletedJuzRange, getJuzBoundsRange } from "@/lib/quran-data";
 import {
   EnrollmentJuzReviewStatus,
@@ -34,10 +39,6 @@ import {
 } from "@/lib/enrollment-test-utils"
 
 const TEST_RESULTS_STORAGE_PREFIX = "enrollment-test-results:";
-const ACCEPT_WHATSAPP_MESSAGE_STORAGE_KEY = "enrollment-accept-whatsapp-message";
-const REJECT_WHATSAPP_MESSAGE_STORAGE_KEY = "enrollment-reject-whatsapp-message";
-const DEFAULT_ACCEPT_WHATSAPP_MESSAGE = "نفيدكم بقبول ابنكم في المجمع";
-const DEFAULT_REJECT_WHATSAPP_MESSAGE = "نفيدكم برفض ابنكم في المجمع";
 
 function getTestResultsStorageKey(requestId: string) {
   return `${TEST_RESULTS_STORAGE_PREFIX}${requestId}`;
@@ -83,22 +84,6 @@ function clearSavedTestResults(requestId: string) {
   if (typeof window === "undefined") return;
 
   window.localStorage.removeItem(getTestResultsStorageKey(requestId));
-}
-
-function loadEnrollmentWhatsAppMessage(storageKey: string, fallbackMessage: string) {
-  if (typeof window === "undefined") return fallbackMessage;
-
-  const storedMessage = window.localStorage.getItem(storageKey)?.trim();
-  return storedMessage || fallbackMessage;
-}
-
-function saveEnrollmentWhatsAppMessage(storageKey: string, message: string) {
-  if (typeof window === "undefined") return;
-
-  const trimmedMessage = message.trim();
-  if (!trimmedMessage) return;
-
-  window.localStorage.setItem(storageKey, trimmedMessage);
 }
 
 function buildDefaultTestResults(juzNumbers: number[], currentResults?: Record<number, EnrollmentJuzTestStatus>) {
@@ -158,6 +143,24 @@ function hasPendingEnrollmentReview(
   return reviewRequestedJuzs.some((juzNumber) => !reviewResults?.[juzNumber]);
 }
 
+function normalizeEnrollmentStatus(status?: string | null) {
+  return status === "provisionally_accepted" ? "provisionally_accepted" : "pending"
+}
+
+function getEnrollmentStatusMeta(status?: string | null) {
+  if (normalizeEnrollmentStatus(status) === "provisionally_accepted") {
+    return {
+      label: "قبول مبدئي",
+      className: "bg-sky-50 text-sky-700",
+    }
+  }
+
+  return {
+    label: "قيد المراجعة",
+    className: "bg-amber-50 text-amber-700",
+  }
+}
+
 interface EnrollmentRequest {
   id: string;
   full_name: string;
@@ -170,6 +173,8 @@ interface EnrollmentRequest {
   test_reviewed?: boolean | null;
   juz_test_results?: Record<number, EnrollmentJuzTestStatus>;
   juz_review_results?: Record<number, EnrollmentJuzReviewStatus>;
+  enrollment_status?: "pending" | "provisionally_accepted" | string | null;
+  provisional_notified_at?: string | null;
 }
 
 export default function EnrollmentRequestsPage() {
@@ -184,6 +189,7 @@ export default function EnrollmentRequestsPage() {
   const [acceptRequest, setAcceptRequest] = useState<EnrollmentRequest | null>(null);
   const [rejectRequest, setRejectRequest] = useState<EnrollmentRequest | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [isProvisionallyAccepting, setIsProvisionallyAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -192,8 +198,12 @@ export default function EnrollmentRequestsPage() {
   const [juzReviewResults, setJuzReviewResults] = useState<Record<number, EnrollmentJuzReviewStatus>>({});
   const [draftJuzReviewResults, setDraftJuzReviewResults] = useState<Record<number, EnrollmentJuzReviewStatus>>({});
   const [isReviewInfoOpen, setIsReviewInfoOpen] = useState(false);
-  const [acceptWhatsAppMessage, setAcceptWhatsAppMessage] = useState(DEFAULT_ACCEPT_WHATSAPP_MESSAGE);
-  const [rejectWhatsAppMessage, setRejectWhatsAppMessage] = useState(DEFAULT_REJECT_WHATSAPP_MESSAGE);
+  const [notificationTemplates, setNotificationTemplates] = useState<EnrollmentNotificationTemplates>(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES);
+  const [notificationTemplatesForm, setNotificationTemplatesForm] = useState<EnrollmentNotificationTemplates>(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES);
+  const [isSavingNotificationTemplates, setIsSavingNotificationTemplates] = useState(false);
+  const [acceptWhatsAppMessage, setAcceptWhatsAppMessage] = useState(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES.finalAccept);
+  const [provisionalWhatsAppMessage, setProvisionalWhatsAppMessage] = useState(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES.provisionalAccept);
+  const [rejectWhatsAppMessage, setRejectWhatsAppMessage] = useState(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES.reject);
   const [acceptForm, setAcceptForm] = useState({
     name: "",
     phone: "",
@@ -269,7 +279,8 @@ export default function EnrollmentRequestsPage() {
       : filterReviewResultsByReviewRequestedJuzs(persistedTestResults, savedTestResults?.juzReviewResults);
 
     setAcceptRequest(req);
-    setAcceptWhatsAppMessage(loadEnrollmentWhatsAppMessage(ACCEPT_WHATSAPP_MESSAGE_STORAGE_KEY, DEFAULT_ACCEPT_WHATSAPP_MESSAGE));
+    setAcceptWhatsAppMessage(notificationTemplatesForm.finalAccept);
+    setProvisionalWhatsAppMessage(notificationTemplatesForm.provisionalAccept);
     setAcceptForm({
       name: req.full_name,
       phone: req.guardian_phone,
@@ -290,7 +301,7 @@ export default function EnrollmentRequestsPage() {
 
   const handleOpenReject = (req: EnrollmentRequest) => {
     setRejectRequest(req);
-    setRejectWhatsAppMessage(loadEnrollmentWhatsAppMessage(REJECT_WHATSAPP_MESSAGE_STORAGE_KEY, DEFAULT_REJECT_WHATSAPP_MESSAGE));
+    setRejectWhatsAppMessage(notificationTemplatesForm.reject);
   };
 
   const sendGuardianWhatsAppMessage = async (phoneNumber: string, message: string) => {
@@ -315,6 +326,42 @@ export default function EnrollmentRequestsPage() {
 
     return { queued };
   };
+
+  const buildGuardianNotificationMessage = (template: string, params?: { studentName?: string; circleName?: string | null }) => {
+    return fillEnrollmentNotificationTemplate(template, {
+      studentName: params?.studentName || acceptForm.name || acceptRequest?.full_name || rejectRequest?.full_name || "",
+      circleName: params?.circleName,
+    }).trim()
+  }
+
+  const saveNotificationTemplates = async () => {
+    setIsSavingNotificationTemplates(true)
+    try {
+      const response = await fetch("/api/enrollment-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update-notification-templates",
+          templates: notificationTemplatesForm,
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(getReadableErrorMessage(payload?.error || payload))
+      }
+
+      const nextTemplates = payload?.notificationTemplates || notificationTemplatesForm
+      setNotificationTemplates(nextTemplates)
+      setNotificationTemplatesForm(nextTemplates)
+      toast({ title: "تم حفظ قوالب الإشعارات" })
+    } catch (error) {
+      console.error("Failed to save enrollment notification templates:", error)
+      toast({ title: "تعذر حفظ القوالب", variant: "destructive" })
+    } finally {
+      setIsSavingNotificationTemplates(false)
+    }
+  }
 
   const handleConfirmAccept = async () => {
     if (!acceptRequest) return;
@@ -425,9 +472,14 @@ export default function EnrollmentRequestsPage() {
       clearSavedTestResults(acceptRequest.id);
       let acceptMessageQueued = false;
       try {
-        const notificationResult = await sendGuardianWhatsAppMessage(acceptForm.phone, acceptWhatsAppMessage);
+        const notificationResult = await sendGuardianWhatsAppMessage(
+          acceptForm.phone,
+          buildGuardianNotificationMessage(acceptWhatsAppMessage, {
+            studentName: acceptForm.name,
+            circleName: selectedCircle.name,
+          }),
+        );
         acceptMessageQueued = notificationResult.queued;
-        saveEnrollmentWhatsAppMessage(ACCEPT_WHATSAPP_MESSAGE_STORAGE_KEY, acceptWhatsAppMessage);
       } catch (notificationError) {
         console.error("Enrollment accept WhatsApp error:", notificationError);
       }
@@ -448,6 +500,68 @@ export default function EnrollmentRequestsPage() {
       }
     } finally {
       setIsAccepting(false);
+    }
+  };
+
+  const handleConfirmProvisionalAccept = async () => {
+    if (!acceptRequest) return;
+    if (!provisionalWhatsAppMessage.trim()) {
+      toast({ title: "خطأ", description: "اكتب نص رسالة القبول المبدئي أولاً", variant: "destructive" });
+      return;
+    }
+
+    setIsProvisionallyAccepting(true);
+    try {
+      const response = await fetch("/api/enrollment-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "mark-provisional-accepted",
+          requestId: acceptRequest.id,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(getReadableErrorMessage(payload?.error || payload));
+      }
+
+      setRequests((current) => current.map((request) => (
+        request.id === acceptRequest.id
+          ? {
+              ...request,
+              enrollment_status: "provisionally_accepted",
+              provisional_notified_at: payload?.request?.provisional_notified_at || new Date().toISOString(),
+            }
+          : request
+      )));
+
+      let provisionalMessageQueued = false;
+      try {
+        const notificationResult = await sendGuardianWhatsAppMessage(
+          acceptForm.phone,
+          buildGuardianNotificationMessage(provisionalWhatsAppMessage, {
+            studentName: acceptForm.name,
+          }),
+        );
+        provisionalMessageQueued = notificationResult.queued;
+      } catch (notificationError) {
+        console.error("Enrollment provisional WhatsApp error:", notificationError);
+      }
+
+      setAcceptRequest(null);
+      setIsTestDialogOpen(false);
+      setIsReviewDialogOpen(false);
+      toast({ title: "تم إرسال القبول المبدئي" });
+
+      if (!provisionalMessageQueued) {
+        toast({ title: "تنبيه", description: "تم تحديث حالة الطلب لكن لم يتم تأكيد إرسال رسالة واتساب لولي الأمر", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error marking provisional acceptance:", error);
+      toast({ title: "حدث خطأ أثناء إرسال القبول المبدئي", variant: "destructive" });
+    } finally {
+      setIsProvisionallyAccepting(false);
     }
   };
 
@@ -504,12 +618,17 @@ export default function EnrollmentRequestsPage() {
         setIsEnrollmentOpen(payload.isEnrollmentOpen);
       }
 
+      const nextTemplates = payload?.notificationTemplates || DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES;
+      setNotificationTemplates(nextTemplates);
+      setNotificationTemplatesForm(nextTemplates);
+
       setRequests(((payload.requests || []) as any[]).map((request: any) => ({
         ...request,
         selected_juzs: normalizeSelectedJuzs(request.selected_juzs),
         test_reviewed: Boolean(request.test_reviewed),
         juz_test_results: normalizeEnrollmentTestResults(request.juz_test_results),
         juz_review_results: normalizeEnrollmentReviewResults(request.juz_review_results),
+        enrollment_status: normalizeEnrollmentStatus(request.enrollment_status),
       })));
     } catch (error: any) {
       console.error("Error fetching requests:", error);
@@ -547,9 +666,13 @@ export default function EnrollmentRequestsPage() {
     try {
       let rejectMessageQueued = false;
       try {
-        const notificationResult = await sendGuardianWhatsAppMessage(rejectRequest.guardian_phone, rejectWhatsAppMessage);
+        const notificationResult = await sendGuardianWhatsAppMessage(
+          rejectRequest.guardian_phone,
+          buildGuardianNotificationMessage(rejectWhatsAppMessage, {
+            studentName: rejectRequest.full_name,
+          }),
+        );
         rejectMessageQueued = notificationResult.queued;
-        saveEnrollmentWhatsAppMessage(REJECT_WHATSAPP_MESSAGE_STORAGE_KEY, rejectWhatsAppMessage);
       } catch (notificationError) {
         console.error("Enrollment reject WhatsApp error:", notificationError);
       }
@@ -662,6 +785,46 @@ export default function EnrollmentRequestsPage() {
 					</section>
 
 					<section className="overflow-hidden rounded-[28px] border border-[#3453a7]/15 bg-white shadow-sm">
+            <div className="border-b border-[#3453a7]/10 px-5 py-4 md:px-6">
+              <div>
+                <h2 className="text-lg font-bold text-[#1a2332]">قوالب الإشعارات</h2>
+                <p className="text-sm text-neutral-500">المتغيرات المتاحة: <span dir="ltr">&#123;student_name&#125;</span> و <span dir="ltr">&#123;circle_name&#125;</span> للقبول النهائي.</p>
+              </div>
+            </div>
+            <div className="grid gap-4 px-5 py-5 md:grid-cols-3 md:px-6">
+              <div className="grid gap-2">
+                <Label>قالب القبول النهائي</Label>
+                <textarea
+                  value={notificationTemplatesForm.finalAccept}
+                  onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, finalAccept: e.target.value }))}
+                  className="min-h-[140px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>قالب القبول المبدئي</Label>
+                <textarea
+                  value={notificationTemplatesForm.provisionalAccept}
+                  onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, provisionalAccept: e.target.value }))}
+                  className="min-h-[140px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>قالب الرفض</Label>
+                <textarea
+                  value={notificationTemplatesForm.reject}
+                  onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, reject: e.target.value }))}
+                  className="min-h-[140px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-[#3453a7]/10 px-5 py-4 md:px-6">
+              <Button onClick={saveNotificationTemplates} disabled={isSavingNotificationTemplates} className="bg-[#3453a7] text-white hover:bg-[#24428f]">
+                {isSavingNotificationTemplates ? "جارٍ الحفظ..." : "حفظ القوالب"}
+              </Button>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-[28px] border border-[#3453a7]/15 bg-white shadow-sm">
 						<div className="flex items-center justify-between border-b border-[#3453a7]/10 px-5 py-4 md:px-6">
 							<div>
 								<h2 className="text-lg font-bold text-[#1a2332]">قائمة الطلبات</h2>
@@ -688,6 +851,7 @@ export default function EnrollmentRequestsPage() {
 											<th className="px-6 py-4 font-semibold">رقم الهوية</th>
 											<th className="px-6 py-4 font-semibold">المرحلة الدراسية</th>
 											<th className="px-6 py-4 font-semibold">المحفوظ</th>
+                      <th className="px-6 py-4 font-semibold">الحالة</th>
 											<th className="px-6 py-4 font-semibold">تاريخ الطلب</th>
 											<th className="px-6 py-4 font-semibold">الإجراءات</th>
 										</tr>
@@ -717,6 +881,12 @@ export default function EnrollmentRequestsPage() {
 												<td className="px-6 py-4 text-gray-600">
                           {formatMemorizedDisplay(request.memorized_amount, request.selected_juzs)}
 												</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {(() => {
+                            const statusMeta = getEnrollmentStatusMeta(request.enrollment_status)
+                            return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusMeta.className}`}>{statusMeta.label}</span>
+                          })()}
+                        </td>
 												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 													{new Date(request.created_at).toLocaleString("ar-SA", {
 														year: "numeric",
@@ -853,10 +1023,19 @@ export default function EnrollmentRequestsPage() {
 						</div>
 
             <div className="grid gap-2">
-              <Label>رسالة ولي الأمر عبر الواتساب</Label>
+              <Label>رسالة القبول النهائي لولي الأمر عبر الواتساب</Label>
               <textarea
                 value={acceptWhatsAppMessage}
                 onChange={(e) => setAcceptWhatsAppMessage(e.target.value)}
+                className="min-h-[120px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>رسالة القبول المبدئي لولي الأمر عبر الواتساب</Label>
+              <textarea
+                value={provisionalWhatsAppMessage}
+                onChange={(e) => setProvisionalWhatsAppMessage(e.target.value)}
                 className="min-h-[120px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
               />
             </div>
@@ -870,6 +1049,13 @@ export default function EnrollmentRequestsPage() {
 
           <DialogFooter className="gap-2 border-t border-[#3453a7]/10 bg-white px-6 py-4 sm:space-x-0">
 						<Button variant="outline" onClick={() => setAcceptRequest(null)}>إلغاء</Button>
+            <Button
+              disabled={isProvisionallyAccepting}
+              onClick={handleConfirmProvisionalAccept}
+              className="bg-sky-600 text-white hover:bg-sky-700 disabled:bg-sky-600 disabled:text-white disabled:opacity-35 disabled:pointer-events-none"
+            >
+              {isProvisionallyAccepting ? "جارٍ الإرسال..." : "قبول مبدئي"}
+            </Button>
 						<Button
               disabled={isAccepting || !isAcceptReady}
 							onClick={handleConfirmAccept}

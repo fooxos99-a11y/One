@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       ? body.selectedJuzs.map((value: unknown) => Number(value)).filter((value: number) => Number.isInteger(value) && value >= 1 && value <= 30)
       : []
 
-    if (!fullName || !guardianPhone || !idNumber || !educationalStage || !memorizedAmount || selectedJuzs.length === 0) {
+    if (!fullName || !guardianPhone || !idNumber || !educationalStage) {
       return NextResponse.json({ error: "جميع الحقول المطلوبة يجب تعبئتها" }, { status: 400 })
     }
 
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
         guardian_phone: guardianPhone,
         id_number: idNumber,
         educational_stage: educationalStage,
-        memorized_amount: memorizedAmount,
+        memorized_amount: memorizedAmount || null,
         selected_juzs: selectedJuzs,
       },
     ])

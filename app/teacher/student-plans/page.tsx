@@ -927,7 +927,7 @@ export default function TeacherStudentPlansPage() {
 
     const confirmed = await confirmDialog({
       title: "حذف الخطة",
-      description: `سيتم حذف خطة ${student.name} الحالية فقط، دون حذف المحفوظ السابق. هل تريد المتابعة؟`,
+      description: `سيتم حذف خطة ${student.name} الحالية وإزالة كل محفوظها الحالي، ثم إعادة الطالب إلى محفوظ ما قبل الخطة. هل تريد المتابعة؟`,
       confirmText: "حذف الخطة",
       cancelText: "إلغاء",
     })
@@ -946,6 +946,15 @@ export default function TeacherStudentPlansPage() {
       if (!res.ok) {
         throw new Error(data?.error || "فشل في حذف الخطة")
       }
+
+      const updatedStudent = data?.student
+        ? {
+            ...student,
+            ...data.student,
+          }
+        : student
+
+      setStudents((prev) => prev.map((item) => item.id === student.id ? updatedStudent : item))
 
       setStudentPlans((prev) => ({ ...prev, [student.id]: null }))
       setStudentProgress((prev) => ({ ...prev, [student.id]: 0 }))

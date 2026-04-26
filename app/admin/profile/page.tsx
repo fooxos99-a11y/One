@@ -12,6 +12,7 @@ import { User, Edit2, Save, X } from "lucide-react"
 import { useAlertDialog } from "@/hooks/use-confirm-dialog"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { SiteLoader } from "@/components/ui/site-loader"
+import { normalizeDigitsToEnglish } from "@/lib/number-format"
 
 interface AdminData {
   id: string
@@ -154,7 +155,7 @@ export default function AdminProfilePage() {
           id: adminData.id,
           name: normalizedName,
           phone_number: editedPhoneNumber || null,
-          id_number: editedIdNumber || null,
+          id_number: normalizeDigitsToEnglish(editedIdNumber) || null,
         }),
       })
 
@@ -269,7 +270,7 @@ export default function AdminProfilePage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-[#1a2332]/70">رقم الحساب</Label>
                   <div className="p-4 bg-gray-50 rounded-xl text-lg font-bold text-[#1a2332]">
-                    {adminData.account_number}
+                    <span dir="ltr">{normalizeDigitsToEnglish(adminData.account_number)}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -294,14 +295,14 @@ export default function AdminProfilePage() {
                   {isEditing ? (
                     <Input
                       value={editedIdNumber}
-                      onChange={(e) => setEditedIdNumber(e.target.value)}
+                      onChange={(e) => setEditedIdNumber(normalizeDigitsToEnglish(e.target.value))}
                       placeholder="أدخل رقم الهوية"
                       className="text-lg font-bold"
                       dir="ltr"
                     />
                   ) : (
-                    <div className="p-4 bg-gray-50 rounded-xl text-lg font-bold text-[#1a2332]">
-                      {adminData.id_number || "غير محدد"}
+                    <div className="p-4 bg-gray-50 rounded-xl text-lg font-bold text-[#1a2332]" dir="ltr">
+                      {adminData.id_number ? normalizeDigitsToEnglish(adminData.id_number) : "غير محدد"}
                     </div>
                   )}
                 </div>

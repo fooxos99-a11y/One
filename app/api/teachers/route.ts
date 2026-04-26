@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { isPrivilegedRole, requireRoles } from "@/lib/auth/guards"
 import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
+import { normalizeDigitsToEnglish } from "@/lib/number-format"
 
 function getErrorMessage(error: unknown) {
   if (!error) return "حدث خطأ غير معروف"
@@ -161,10 +162,10 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const name = String(body.name || "").trim()
-    const idNumber = String(body.id_number || "").trim()
+    const idNumber = normalizeDigitsToEnglish(String(body.id_number || "").trim())
     const halaqah = String(body.halaqah || "").trim()
     const role = String(body.role || "").trim()
-    const accountNumber = Number.parseInt(String(body.account_number || ""), 10)
+    const accountNumber = Number.parseInt(normalizeDigitsToEnglish(String(body.account_number || "")), 10)
 
     if (!name || !idNumber || Number.isNaN(accountNumber) || !halaqah) {
       return NextResponse.json({ error: "جميع الحقول مطلوبة" }, { status: 400 })
@@ -310,8 +311,8 @@ export async function PATCH(request: Request) {
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
     if (phone_number !== undefined) updateData.phone_number = phone_number
-    if (id_number !== undefined) updateData.id_number = id_number
-    if (account_number !== undefined) updateData.account_number = account_number
+    if (id_number !== undefined) updateData.id_number = normalizeDigitsToEnglish(String(id_number || "").trim()) || null
+    if (account_number !== undefined) updateData.account_number = Number.parseInt(normalizeDigitsToEnglish(String(account_number || "")), 10)
     if (halaqah !== undefined) updateData.halaqah = halaqah
     if (role !== undefined) updateData.role = role === "deputy_teacher" ? "deputy_teacher" : "teacher"
 
@@ -320,10 +321,14 @@ export async function PATCH(request: Request) {
     }
 
     if (account_number !== undefined) {
+      if (Number.isNaN(updateData.account_number)) {
+        return NextResponse.json({ error: "رقم الحساب غير صالح" }, { status: 400 })
+      }
+
       const { data: existingUser, error: accountError } = await supabase
         .from("users")
         .select("id")
-        .eq("account_number", account_number)
+        .eq("account_number", updateData.account_number)
         .neq("id", id)
         .maybeSingle()
 

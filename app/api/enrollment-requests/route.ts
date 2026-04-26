@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
 
 import { requireRoles } from "@/lib/auth/guards"
+import {
+  getEnrollmentNotificationTemplates,
+  normalizeEnrollmentNotificationTemplates,
+  saveEnrollmentNotificationTemplates,
+} from "@/lib/enrollment-notification-templates"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const ENROLLMENT_STATUS_PROGRAM_ID = "00000000-0000-0000-0000-000000000000"
@@ -27,6 +32,7 @@ export async function GET(request: Request) {
       supabase.from("enrollment_requests").select("*").order("created_at", { ascending: false }),
       supabase.from("programs").select("is_active").eq("id", ENROLLMENT_STATUS_PROGRAM_ID).maybeSingle(),
     ])
+    const notificationTemplates = await getEnrollmentNotificationTemplates(supabase)
 
     if (requestsResult.error) {
       throw requestsResult.error
@@ -39,6 +45,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       requests: requestsResult.data || [],
       isEnrollmentOpen: statusResult.data?.is_active ?? true,
+      notificationTemplates,
     })
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
@@ -76,6 +83,35 @@ export async function PATCH(request: Request) {
       }
 
       return NextResponse.json({ success: true })
+    }
+
+    if (action === "mark-provisional-accepted") {
+      const requestId = String(body.requestId || "").trim()
+      if (!requestId) {
+        return NextResponse.json({ error: "معرف الطلب مطلوب" }, { status: 400 })
+      }
+
+      const { data, error } = await supabase
+        .from("enrollment_requests")
+        .update({
+          enrollment_status: "provisionally_accepted",
+          provisional_notified_at: new Date().toISOString(),
+        })
+        .eq("id", requestId)
+        .select("id, enrollment_status, provisional_notified_at")
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      return NextResponse.json({ success: true, request: data })
+    }
+
+    if (action === "update-notification-templates") {
+      const templates = normalizeEnrollmentNotificationTemplates(body.templates)
+      const savedTemplates = await saveEnrollmentNotificationTemplates(supabase, templates)
+      return NextResponse.json({ success: true, notificationTemplates: savedTemplates })
     }
 
     if (action === "toggle-status") {

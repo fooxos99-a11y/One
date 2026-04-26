@@ -15,6 +15,7 @@ function createAuthSuccessResponse(user: {
   id: string
   name: string
   role: "student" | "teacher" | "deputy_teacher" | "admin" | "supervisor"
+  roleName?: string
   accountNumber: string | number
   halaqah?: string
 }) {
@@ -31,6 +32,7 @@ function createAuthSuccessResponse(user: {
         id: user.id,
         name: user.name,
         role: user.role,
+        roleName: user.roleName || user.role,
         accountNumber: user.accountNumber,
         halaqah: user.halaqah || "",
       },
@@ -67,7 +69,65 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "لا توجد جلسة صالحة" }, { status: 401 })
   }
 
-  return NextResponse.json({ success: true, user: session })
+  try {
+    const supabase = createAdminClient()
+
+    if (session.role === "student") {
+      const { data: student } = await supabase
+        .from("students")
+        .select("id, name, account_number, halaqah")
+        .eq("account_number", Number(session.accountNumber))
+        .maybeSingle()
+
+      if (student) {
+        return NextResponse.json({
+          success: true,
+          user: {
+            ...session,
+            id: String(student.id),
+            name: student.name || session.name,
+            role: "student",
+            roleName: "student",
+            accountNumber: student.account_number || session.accountNumber,
+            halaqah: student.halaqah || "",
+          },
+        })
+      }
+    } else {
+      const { data: user } = await supabase
+        .from("users")
+        .select("id, name, role, account_number, halaqah")
+        .eq("account_number", Number(session.accountNumber))
+        .maybeSingle()
+
+      if (user) {
+        const normalizedRole = normalizeAppRole(user.role) || session.role
+
+        return NextResponse.json({
+          success: true,
+          user: {
+            ...session,
+            id: String(user.id),
+            name: user.name || session.name,
+            role: normalizedRole,
+            roleName: String(user.role || normalizedRole),
+            accountNumber: user.account_number || session.accountNumber,
+            halaqah: user.halaqah || "",
+          },
+        })
+      }
+    }
+  } catch (error) {
+    console.error("[auth] Failed to hydrate session role from database:", error)
+  }
+
+  return NextResponse.json({
+    success: true,
+    user: {
+      ...session,
+      roleName: session.role,
+    },
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -116,6 +176,7 @@ export async function POST(request: NextRequest) {
         id: String(user.id),
         name: user.name,
         role: normalizedRole,
+        roleName: String(user.role || normalizedRole),
         accountNumber: user.account_number,
         halaqah: user.halaqah || "",
       })
@@ -136,6 +197,7 @@ export async function POST(request: NextRequest) {
         id: String(student.id),
         name: student.name,
         role: "student",
+        roleName: "student",
         accountNumber: student.account_number,
         halaqah: student.halaqah || "",
       })

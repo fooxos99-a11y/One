@@ -41,11 +41,13 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
         }
 
         const authData = await authResponse.json();
-        const sessionUser = authData.user as { role?: string; accountNumber?: string | number } | undefined;
-        const freshRole = String(sessionUser?.role || "").trim();
+        const sessionUser = authData.user as { role?: string; roleName?: string; accountNumber?: string | number } | undefined;
+        const normalizedRole = String(sessionUser?.role || "").trim();
+        const roleName = String(sessionUser?.roleName || "").trim();
+        const freshRole = roleName || normalizedRole;
         const accountNumber = String(sessionUser?.accountNumber || "").trim();
 
-        if (!freshRole || !accountNumber) {
+        if (!normalizedRole || !accountNumber) {
           localStorage.removeItem("isLoggedIn");
           localStorage.removeItem("userRole");
           router.replace("/login");
@@ -55,14 +57,14 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
         localStorage.setItem("isLoggedIn", "true");
 
         // 2. Reject students and teachers immediately
-        if (freshRole === "student" || freshRole === "teacher" || freshRole === "deputy_teacher" || !freshRole) {
-          localStorage.setItem("userRole", freshRole);
+        if (normalizedRole === "student" || normalizedRole === "teacher" || normalizedRole === "deputy_teacher") {
+          localStorage.setItem("userRole", normalizedRole);
           router.replace("/login");
           return;
         }
 
-        // 3. account_number=2 or "admin" always has full access to everything
-        if (Number(accountNumber) === 2 || freshRole === "admin") {
+        // 3. account_number=2 always has full access to everything
+        if (Number(accountNumber) === 2) {
           localStorage.setItem("userRole", freshRole);
           if (!cancelled) {
             setState({ isLoading: false, isVerified: true, role: freshRole, isFullAccess: true });
@@ -83,15 +85,16 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
         }
 
         const allAdminRoles = ["admin", "مدير", ...validRoles];
+        const isKnownAdminRole = allAdminRoles.includes(freshRole) || normalizedRole === "admin" || normalizedRole === "supervisor";
 
-        if (!allAdminRoles.includes(freshRole)) {
+        if (!isKnownAdminRole) {
           localStorage.setItem("userRole", freshRole);
           router.replace("/login");
           return;
         }
 
-        const isFullAccess = freshRole === "مدير";
-        const rolePermissions: string[] = permissionsMap[freshRole] || [];
+        const isFullAccess = freshRole === "مدير" || freshRole === "admin";
+        const rolePermissions: string[] = permissionsMap[freshRole] || permissionsMap[normalizedRole] || [];
         const hasAll = isFullAccess || rolePermissions.includes("all");
 
         // 5. If a specific permission key is required, check it

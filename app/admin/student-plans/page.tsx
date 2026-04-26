@@ -347,6 +347,62 @@ function getPreferredEndSurah(
   return nearest?.number ?? selectedStartSurah;
 }
 
+function SearchableSurahSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: typeof SURAHS;
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedSurah = options.find((surah) => String(surah.number) === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="flex w-full items-center justify-between rounded-xl border border-[#3453a7]/40 bg-white px-2 text-xs transition-colors hover:border-[#3453a7] disabled:cursor-not-allowed disabled:opacity-60 h-9"
+        >
+          <span className={selectedSurah ? "font-medium text-[#1a2332]" : "text-neutral-400"}>
+            {selectedSurah?.name || placeholder}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(18rem,calc(100vw-2rem))] p-0" align="start" side="bottom" sideOffset={6} dir="rtl">
+        <Command className="overflow-visible">
+          <CommandInput placeholder="ابحث عن سورة..." className="h-9 text-sm" />
+          <CommandEmpty>لا توجد نتائج</CommandEmpty>
+          <CommandList className="surah-scroll max-h-64 overflow-y-auto overscroll-contain touch-pan-y">
+            {options.map((surah) => (
+              <CommandItem
+                key={surah.number}
+                value={`${surah.name} ${surah.number}`}
+                onSelect={() => {
+                  onChange(String(surah.number));
+                  setOpen(false);
+                }}
+                className="flex items-center justify-between"
+              >
+                {surah.name}
+                {value === String(surah.number) ? <Check className="h-3.5 w-3.5 text-[#3453a7]" /> : null}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function getNextStartFromPrevious(
   prevStartSurahValue: string,
   prevEndSurahValue: string,
@@ -1052,7 +1108,7 @@ export default function StudentPlansPage() {
 
     const confirmed = await confirmDialog({
       title: "حذف الخطة",
-      description: `سيتم حذف خطة ${student.name} الحالية فقط، دون حذف المحفوظ السابق. هل تريد المتابعة؟`,
+      description: `سيتم حذف خطة ${student.name} الحالية وإزالة كل محفوظها الحالي، ثم إعادة الطالب إلى محفوظ ما قبل الخطة. هل تريد المتابعة؟`,
       confirmText: "حذف الخطة",
       cancelText: "إلغاء",
     });
@@ -1071,6 +1127,16 @@ export default function StudentPlansPage() {
       if (!res.ok) {
         throw new Error(data?.error || "فشل في حذف الخطة");
       }
+
+      const updatedStudent = data?.student
+        ? {
+            ...student,
+            ...data.student,
+          }
+        : student;
+
+      setStudents((prev) => prev.map((item) => item.id === student.id ? updatedStudent : item));
+      setResetDialogStudents((prev) => prev.map((item) => item.id === student.id ? updatedStudent : item));
 
       setStudentPlans((prev) => ({ ...prev, [student.id]: null }));
       setStudentProgress((prev) => ({ ...prev, [student.id]: 0 }));
@@ -1788,18 +1854,15 @@ export default function StudentPlansPage() {
                         <div className="space-y-1.5 flex flex-col w-full">
                           <label className="text-xs font-semibold text-[#1a2332]">بداية الحفظ السابق</label>
                           <div className="flex items-center gap-2 w-full">
-                            <Select value={range.startSurah} onValueChange={(value) => updatePreviousRange(range.id, { startSurah: value, startVerse: "" })} disabled={isPreviousLocked}>
-                              <SelectTrigger className="flex-1 h-9 border-[#3453a7]/40 text-xs bg-white px-2" dir="rtl">
-                                <SelectValue placeholder="اختر السورة" />
-                              </SelectTrigger>
-                              <SelectContent dir="rtl" className="max-h-56">
-                                {getPreviousRangeSurahOptions(range, "start").map((surah) => (
-                                  <SelectItem key={surah.number} value={String(surah.number)} className="text-xs text-right">
-                                    {surah.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex-1">
+                              <SearchableSurahSelect
+                                value={range.startSurah}
+                                onChange={(value) => updatePreviousRange(range.id, { startSurah: value, startVerse: "" })}
+                                options={getPreviousRangeSurahOptions(range, "start")}
+                                placeholder="اختر السورة"
+                                disabled={isPreviousLocked}
+                              />
+                            </div>
 
                             <Select value={range.startVerse} onValueChange={(value) => updatePreviousRange(range.id, { startVerse: value })} disabled={isPreviousLocked || !range.startSurah || getPreviousRangeStartVerseOptions(range).length === 0}>
                               <SelectTrigger className="w-[84px] h-9 border-[#3453a7]/40 text-xs bg-white px-2" dir="rtl">
@@ -1819,18 +1882,15 @@ export default function StudentPlansPage() {
                         <div className="space-y-1.5 flex flex-col w-full">
                           <label className="text-xs font-semibold text-[#1a2332]">نهاية الحفظ السابق</label>
                           <div className="flex items-center gap-2 w-full">
-                            <Select value={range.endSurah} onValueChange={(value) => updatePreviousRange(range.id, { endSurah: value, endVerse: "" })} disabled={isPreviousLocked}>
-                              <SelectTrigger className="flex-1 h-9 border-[#3453a7]/40 text-xs bg-white px-2" dir="rtl">
-                                <SelectValue placeholder="اختر السورة" />
-                              </SelectTrigger>
-                              <SelectContent dir="rtl" className="max-h-56">
-                                {getPreviousRangeSurahOptions(range, "end").map((surah) => (
-                                  <SelectItem key={surah.number} value={String(surah.number)} className="text-xs text-right">
-                                    {surah.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex-1">
+                              <SearchableSurahSelect
+                                value={range.endSurah}
+                                onChange={(value) => updatePreviousRange(range.id, { endSurah: value, endVerse: "" })}
+                                options={getPreviousRangeSurahOptions(range, "end")}
+                                placeholder="اختر السورة"
+                                disabled={isPreviousLocked}
+                              />
+                            </div>
 
                             <Select value={range.endVerse} onValueChange={(value) => updatePreviousRange(range.id, { endVerse: value })} disabled={isPreviousLocked || !range.endSurah || getPreviousRangeEndVerseOptions(range).length === 0}>
                               <SelectTrigger className="w-[84px] h-9 border-[#3453a7]/40 text-xs bg-white px-2" dir="rtl">

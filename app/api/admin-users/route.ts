@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireRoles } from "@/lib/auth/guards"
 import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
+import { normalizeDigitsToEnglish } from "@/lib/number-format"
 
 function getErrorMessage(error: unknown) {
   if (!error) return "حدث خطأ غير معروف"
@@ -90,7 +91,7 @@ export async function GET(request: Request) {
       throw error
     }
 
-    const users = (data || []).filter((user) => {
+    const users = (data || []).filter((user: any) => {
       const accountNumber = Number(user.account_number)
       return isStaffRole(String(user.role || "")) && (includeProtected || !isProtectedAdminAccount(accountNumber))
     })
@@ -109,9 +110,9 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const name = String(body.name || "").trim()
-    const idNumber = String(body.id_number || "").trim()
+    const idNumber = normalizeDigitsToEnglish(String(body.id_number || "").trim())
     const role = String(body.role || "").trim()
-    const accountNumber = Number.parseInt(String(body.account_number || ""), 10)
+    const accountNumber = Number.parseInt(normalizeDigitsToEnglish(String(body.account_number || "")), 10)
 
     if (!name || !role || Number.isNaN(accountNumber)) {
       return NextResponse.json({ error: "الاسم ورقم الحساب والمسمى الوظيفي مطلوبة" }, { status: 400 })
@@ -196,9 +197,9 @@ export async function PATCH(request: Request) {
     const updateData: Record<string, unknown> = {}
     if (body.name !== undefined) updateData.name = String(body.name || "").trim()
     if (!isProtectedAccount && body.role !== undefined) updateData.role = String(body.role || "").trim()
-    if (body.id_number !== undefined) updateData.id_number = String(body.id_number || "").trim() || null
+    if (body.id_number !== undefined) updateData.id_number = normalizeDigitsToEnglish(String(body.id_number || "").trim()) || null
     if (!isProtectedAccount && body.account_number !== undefined) {
-      const accountNumber = Number.parseInt(String(body.account_number || ""), 10)
+      const accountNumber = Number.parseInt(normalizeDigitsToEnglish(String(body.account_number || "")), 10)
       if (Number.isNaN(accountNumber)) {
         return NextResponse.json({ error: "رقم الحساب غير صالح" }, { status: 400 })
       }
@@ -263,6 +264,24 @@ export async function DELETE(request: Request) {
 
     if (isProtectedAdminAccount(Number(existingUser?.account_number))) {
       return NextResponse.json({ error: "هذا الحساب الإداري ثابت ولا يمكن حذفه" }, { status: 403 })
+    }
+
+    const { error: clearWhatsappMessagesError } = await supabase
+      .from("whatsapp_messages")
+      .update({ sent_by: null })
+      .eq("sent_by", id)
+
+    if (clearWhatsappMessagesError && clearWhatsappMessagesError.code !== "42P01") {
+      throw clearWhatsappMessagesError
+    }
+
+    const { error: clearWhatsappQuickMessagesError } = await supabase
+      .from("whatsapp_quick_messages")
+      .update({ created_by: null })
+      .eq("created_by", id)
+
+    if (clearWhatsappQuickMessagesError && clearWhatsappQuickMessagesError.code !== "42P01") {
+      throw clearWhatsappQuickMessagesError
     }
 
     const { error } = await supabase.from("users").delete().eq("id", id)

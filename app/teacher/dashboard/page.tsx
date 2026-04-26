@@ -6,6 +6,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { SiteLoader } from "@/components/ui/site-loader"
+import { normalizeDigitsToEnglish } from "@/lib/number-format"
 
 export default function TeacherDashboard() {
   const [isLoading, setIsLoading] = useState(true)
@@ -89,8 +90,8 @@ export default function TeacherDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   <div className="space-y-2">
                     <label className="text-xs md:text-sm font-semibold text-[#1a2332]/70">رقم الحساب</label>
-                    <div className="p-3 md:p-4 bg-gray-50 rounded-xl text-base md:text-lg font-bold text-[#1a2332]">
-                      {teacherData?.account_number || "-"}
+                    <div className="p-3 md:p-4 bg-gray-50 rounded-xl text-base md:text-lg font-bold text-[#1a2332]" dir="ltr">
+                      {teacherData?.account_number ? normalizeDigitsToEnglish(teacherData.account_number) : "-"}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -101,8 +102,8 @@ export default function TeacherDashboard() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs md:text-sm font-semibold text-[#1a2332]/70">رقم الهوية</label>
-                    <div className="p-3 md:p-4 bg-gray-50 rounded-xl text-base md:text-lg font-bold text-[#1a2332]">
-                      {teacherData?.id_number || "-"}
+                    <div className="p-3 md:p-4 bg-gray-50 rounded-xl text-base md:text-lg font-bold text-[#1a2332]" dir="ltr">
+                      {teacherData?.id_number ? normalizeDigitsToEnglish(teacherData.id_number) : "-"}
                     </div>
                   </div>
                   <div className="space-y-2">

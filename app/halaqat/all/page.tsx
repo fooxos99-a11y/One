@@ -126,7 +126,7 @@ export default function AllCirclesPage() {
   useEffect(() => {
     async function fetchAllCircles() {
       try {
-        const response = await fetch("/api/students", { cache: "no-store" })
+        const response = await fetch("/api/students?leaderboard=1", { cache: "no-store" })
         const data = await response.json()
         const students = (data.students ?? []) as StudentRow[]
         const circleTotals = new Map<string, CircleRank>()
@@ -160,7 +160,7 @@ export default function AllCirclesPage() {
           return left.name.localeCompare(right.name, "ar")
         })
 
-        setCircles(rankedCircles.slice(0, 10))
+        setCircles(rankedCircles)
       } catch (error) {
         console.error("Error fetching all circles:", error)
         setCircles([])

@@ -33,6 +33,13 @@ type StudentRow = {
   guardian_phone: string | null
 }
 
+type UserRow = {
+  id: string
+  name: string | null
+  role: string | null
+  phone_number: string | null
+}
+
 function normalizePhoneForMatching(phone: string | null | undefined) {
   if (!phone) {
     return null
@@ -106,6 +113,32 @@ function pickOriginalMessage(
   return messagesForPhone[0] || null
 }
 
+function getResponderDisplayName(student: StudentRow | undefined, user: UserRow | undefined) {
+  if (student?.name) {
+    return `ولي أمر الطالب: ${student.name}`
+  }
+
+  if (!user?.name) {
+    return "غير معروف"
+  }
+
+  const normalizedRole = String(user.role || "").trim().toLowerCase()
+
+  if (["teacher", "معلم"].includes(normalizedRole)) {
+    return `المعلم: ${user.name}`
+  }
+
+  if (["deputy_teacher", "نائب معلم"].includes(normalizedRole)) {
+    return `نائب المعلم: ${user.name}`
+  }
+
+  if (["admin", "supervisor", "مدير", "سكرتير", "مشرف تعليمي", "مشرف تربوي", "مشرف برامج"].includes(normalizedRole)) {
+    return `الإداري: ${user.name}`
+  }
+
+  return user.name
+}
+
 /**
  * GET /api/whatsapp/replies
  * الحصول على قائمة الردود المستلمة
@@ -168,8 +201,9 @@ export async function GET(request: Request) {
         .order("created_at", { ascending: false })
     }
 
-    const [{ data: students, error: studentsError }, messagesResult] = await Promise.all([
+    const [{ data: students, error: studentsError }, { data: users, error: usersError }, messagesResult] = await Promise.all([
       supabase.from("students").select("id, name, guardian_phone"),
+      supabase.from("users").select("id, name, role, phone_number"),
       buildMessagesQuery("id, phone_number, message_text, message_type, media_mime_type, media_base64, created_at"),
     ])
 
@@ -190,6 +224,14 @@ export async function GET(request: Request) {
       )
     }
 
+    if (usersError) {
+      console.error("[WhatsApp] Error fetching users for replies:", usersError)
+      return NextResponse.json(
+        { error: "فشل في جلب بيانات المستخدمين" },
+        { status: 500 }
+      )
+    }
+
     if (messagesError) {
       console.error("[WhatsApp] Error fetching sent messages for replies:", messagesError)
       return NextResponse.json(
@@ -203,6 +245,14 @@ export async function GET(request: Request) {
       const normalizedPhone = normalizePhoneForMatching(student.guardian_phone)
       if (normalizedPhone && !studentByPhone.has(normalizedPhone)) {
         studentByPhone.set(normalizedPhone, student)
+      }
+    }
+
+    const userByPhone = new Map<string, UserRow>()
+    for (const user of ((users || []) as UserRow[])) {
+      const normalizedPhone = normalizePhoneForMatching(user.phone_number)
+      if (normalizedPhone && !userByPhone.has(normalizedPhone)) {
+        userByPhone.set(normalizedPhone, user)
       }
     }
 
@@ -247,13 +297,14 @@ export async function GET(request: Request) {
     const summarizedReplies = Array.from(firstReplyByMessage.values())
       .map(({ normalizedPhone, reply, originalMessage }) => {
         const student = studentByPhone.get(normalizedPhone)
+        const user = userByPhone.get(normalizedPhone)
         const replyDate = getReplyDate(reply)
 
         return {
           id: reply.id,
           from_phone: reply.from_phone,
           student_id: student?.id || null,
-          student_name: student?.name || "غير معروف",
+          student_name: getResponderDisplayName(student, user),
           sent_message_text: originalMessage.message_text,
           sent_message_type: originalMessage.message_type || "text",
           sent_media_mime_type: originalMessage.media_mime_type || null,
