@@ -263,7 +263,7 @@ function ProfilePage() {
   const fetchStudentIndicator = async () => {
     try {
       setIsLoadingIndicator(true)
-      const response = await fetch("/api/statistics/my-indicator?filter=currentMonth", { cache: "no-store" })
+      const response = await fetch("/api/statistics/my-indicator?filter=currentSemester", { cache: "no-store" })
       const data = await response.json()
       setStudentIndicator(data.indicator || null)
     } catch (error) {
@@ -555,7 +555,7 @@ function ProfilePage() {
                     { value: "profile",      icon: <User       className="w-5 h-5" />, label: "الملف"      },
                     { value: "achievements", icon: <Award      className="w-5 h-5" />, label: "الإنجازات"  },
                     { value: "records",      icon: <BarChart3  className="w-5 h-5" />, label: "السجلات"    },
-                    { value: "indicators",   icon: <Trophy     className="w-5 h-5" />, label: "مؤشري"     },
+                    { value: "indicators",   icon: <Trophy     className="w-5 h-5" />, label: "المؤشر"    },
                     { value: "plan",         icon: <BookMarked className="w-5 h-5" />, label: "الخطة"      },
                     { value: "archive",      icon: <Library className="w-5 h-5" />, label: "المحفوظ"    },
                   ].map((item) => (
@@ -781,13 +781,7 @@ function ProfilePage() {
               </TabsContent>
               <TabsContent value="indicators" className="space-y-4 md:space-y-6">
                 <Card className="rounded-none border-0 shadow-none">
-                  <CardHeader className="bg-white p-4 md:p-6">
-                    <CardTitle className="text-xl md:text-2xl text-[#1a2332]">مؤشري لهذا الشهر</CardTitle>
-                    <CardDescription className="text-sm font-semibold text-[#5b6472]">
-                      تظهر هنا بطاقة أدائك الخاصة بك فقط
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-2 md:pt-3 space-y-4 md:space-y-6">
+                  <CardContent className="space-y-4 p-4 md:space-y-6 md:p-6">
                     {isLoadingIndicator ? (
                       <div className="flex justify-center py-12">
                         <SiteLoader size="md" color="#3453a7" />
@@ -799,7 +793,7 @@ function ProfilePage() {
                       </div>
                     ) : (
                       <div className="space-y-4 rounded-[24px] border border-[#e5e7eb] bg-white p-5 shadow-sm md:p-6">
-                        <div className="flex flex-col gap-3 border-b border-[#edf0f3] pb-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex flex-col gap-3 border-b border-[#edf0f3] pb-4 md:flex-row-reverse md:items-center md:justify-between">
                           <div className="text-right">
                             <div className="text-lg font-black text-[#1f2937]">{studentIndicator.name}</div>
                             <div className="mt-1 text-sm font-bold text-[#667085]">{studentIndicator.circleName}</div>

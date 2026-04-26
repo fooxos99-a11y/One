@@ -11,7 +11,7 @@ import { applyAttendancePointsAdjustment, calculateTotalEvaluationPoints, isPass
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-type DateFilter = "today" | "currentWeek" | "currentMonth" | "all" | "custom"
+type DateFilter = "today" | "currentWeek" | "currentMonth" | "currentSemester" | "all" | "custom"
 
 type CustomDateRange = {
   start: string
@@ -245,7 +245,7 @@ export async function GET(request: NextRequest) {
       return auth.response
     }
 
-    const filter = (request.nextUrl.searchParams.get("filter") || "currentMonth") as DateFilter
+    const filter = (request.nextUrl.searchParams.get("filter") || "currentSemester") as DateFilter
     const customRange: CustomDateRange = {
       start: request.nextUrl.searchParams.get("start") || formatDateForQuery(new Date()),
       end: request.nextUrl.searchParams.get("end") || formatDateForQuery(new Date()),
@@ -288,6 +288,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ indicator: null, error: "تعذر العثور على بيانات الطالب" }, { status: 404 })
     }
 
+    const effectiveStart = filter === "currentSemester"
+      ? activeSemesterStartDate ?? start
+      : start
+    const effectiveEnd = end
+
     let plansQuery = supabase
       .from("student_plans")
       .select("id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges")
@@ -318,8 +323,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (filter !== "all") {
-      attendanceQuery = attendanceQuery.gte("date", formatDateForQuery(start)).lte("date", formatDateForQuery(end))
-      dailyReportsQuery = dailyReportsQuery.gte("report_date", formatDateForQuery(start)).lte("report_date", formatDateForQuery(end))
+      attendanceQuery = attendanceQuery.gte("date", formatDateForQuery(effectiveStart)).lte("date", formatDateForQuery(effectiveEnd))
+      dailyReportsQuery = dailyReportsQuery.gte("report_date", formatDateForQuery(effectiveStart)).lte("report_date", formatDateForQuery(effectiveEnd))
     }
 
     const [plansResult, attendanceResult, dailyReportsResult] = await Promise.all([
@@ -339,7 +344,14 @@ export async function GET(request: NextRequest) {
     const plans = (plansResult.data ?? []) as PlanRow[]
     const dailyReports = (dailyReportsResult.data ?? []) as DailyReportRow[]
     const attendance = ((attendanceResult.data ?? []) as AttendanceRow[]).filter((record) => isStudyDay(record.date))
-    const studyDates = getStudyDatesInRange(filter === "all" ? activeSemesterStartDate ?? start : start, end)
+    const studyDates = getStudyDatesInRange(
+      filter === "all"
+        ? activeSemesterStartDate ?? start
+        : filter === "currentSemester"
+          ? effectiveStart
+          : start,
+      effectiveEnd,
+    )
     const indicator = createStudentIndicatorSummary(
       student.id,
       student.name?.trim() || TEXT.unknownStudent,
@@ -417,7 +429,14 @@ export async function GET(request: NextRequest) {
 
     const denominator = indicator.expectedRecords > 0
       ? indicator.expectedRecords
-      : countStudyDaysInRange(filter === "all" ? activeSemesterStartDate ?? start : start, end)
+      : countStudyDaysInRange(
+          filter === "all"
+            ? activeSemesterStartDate ?? start
+            : filter === "currentSemester"
+              ? effectiveStart
+              : start,
+          effectiveEnd,
+        )
     const evalPercent = indicator.maxPoints > 0 ? (indicator.earnedPoints / indicator.maxPoints) * 100 : 0
 
     indicator.percent = evalPercent

@@ -1555,7 +1555,7 @@ export function Header() {
                 />
                 <NavItem
                   icon={Trophy}
-                  label="مؤشري"
+                  label="المؤشر"
                   onClick={() => { handleNav("/profile?tab=indicators"); setIsMobileMenuOpen(false); }}
                 />
                 <NavItem
