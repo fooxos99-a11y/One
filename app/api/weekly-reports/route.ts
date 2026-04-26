@@ -172,6 +172,18 @@ function isMissingDailyReportsTable(error: unknown) {
   return candidate.code === "PGRST205" && typeof candidate.message === "string" && candidate.message.includes("student_daily_reports")
 }
 
+function isMissingStudentPlanOptionalColumn(error: unknown) {
+  const message = String((error as { message?: string } | null)?.message || "")
+
+  return [
+    "review_distribution_mode",
+    "muraajaa_mode",
+    "weekly_muraajaa_min_daily_pages",
+    "weekly_muraajaa_start_day",
+    "weekly_muraajaa_end_day",
+  ].some((columnName) => message.includes(columnName) && message.includes("does not exist"))
+}
+
 function getDailyCompletionFlags(record?: AttendanceRow, dailyReport?: DailyReportRow) {
   const evaluation = record ? getEvaluationRecord(record.evaluations) : {}
 
@@ -279,10 +291,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ students: [], hasPreviousWeek: false, error: "" })
     }
 
-    let plansQuery = supabase
-      .from("student_plans")
-      .select("id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, review_distribution_mode, muraajaa_mode, weekly_muraajaa_min_daily_pages, weekly_muraajaa_start_day, weekly_muraajaa_end_day, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges, completed_juzs")
-      .in("student_id", studentIds)
+    const fullPlanSelect = "id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, review_distribution_mode, muraajaa_mode, weekly_muraajaa_min_daily_pages, weekly_muraajaa_start_day, weekly_muraajaa_end_day, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges, completed_juzs"
+    const fallbackPlanSelect = "id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges, completed_juzs"
+
+    const buildPlansQuery = (selectClause: string) => {
+      let query = supabase
+        .from("student_plans")
+        .select(selectClause)
+        .in("student_id", studentIds)
+
+      if (activeSemesterId) {
+        query = query.eq("semester_id", activeSemesterId)
+      }
+
+      return query
+    }
 
     let attendanceRangeQuery = supabase
       .from("attendance_records")
@@ -304,16 +327,19 @@ export async function GET(request: Request) {
       .lte("date", previousWeek.endDate)
 
     if (activeSemesterId) {
-      plansQuery = plansQuery.eq("semester_id", activeSemesterId)
       attendanceRangeQuery = attendanceRangeQuery.eq("semester_id", activeSemesterId)
       previousWeekAttendanceQuery = previousWeekAttendanceQuery.eq("semester_id", activeSemesterId)
     }
 
-    const [plansResult, attendanceResult, previousWeekAttendanceResult] = await Promise.all([
-      plansQuery,
+    const [initialPlansResult, attendanceResult, previousWeekAttendanceResult] = await Promise.all([
+      buildPlansQuery(fullPlanSelect),
       attendanceRangeQuery,
       previousWeekAttendanceQuery,
     ])
+
+    const plansResult = isMissingStudentPlanOptionalColumn(initialPlansResult.error)
+      ? await buildPlansQuery(fallbackPlanSelect)
+      : initialPlansResult
 
     if (plansResult.error) {
       throw plansResult.error
