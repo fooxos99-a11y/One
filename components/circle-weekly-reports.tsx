@@ -314,19 +314,19 @@ export function CircleWeeklyReports({ circleName, backHref, backLabel, showBackB
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {students.map((student) => (
-                  <article key={student.id} className="overflow-hidden rounded-[28px] border border-[#dde6f0] bg-white shadow-sm">
-                    <div className="p-6">
-                      <div className="mb-5 flex items-start justify-between gap-4">
+                  <article key={student.id} className="overflow-hidden rounded-[24px] border border-[#dde6f0] bg-white shadow-sm">
+                    <div className="p-4">
+                      <div className="mb-4 flex items-start justify-between gap-3">
                         <div className="min-w-0 text-right">
-                          <div className="truncate text-2xl font-black text-[#1f2937]">{student.name}</div>
+                          <div className="truncate text-lg font-black text-[#1f2937]">{student.name}</div>
                         </div>
-                        <Users className="mt-1 h-5 w-5 shrink-0 text-[#6a8fbf]" />
+                        <Users className="mt-0.5 h-4 w-4 shrink-0 text-[#6a8fbf]" />
                       </div>
 
-                      <div className="mb-5 rounded-[24px] border border-[#eef2f6] bg-[#fcfdff] p-4">
-                        <div className="space-y-4">
+                      <div className="rounded-[20px] border border-[#eef2f6] bg-[#fcfdff] p-3">
+                        <div className="space-y-3">
                           <ProgressRow
                             label={TEXT.weeklyAttendance}
                             completed={student.presentCount}
@@ -364,7 +364,7 @@ export function CircleWeeklyReports({ circleName, backHref, backLabel, showBackB
                           />
                         </div>
 
-                        <div className="mt-4 flex flex-wrap gap-2 border-t border-dashed border-[#e2e8f0] pt-4">
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-dashed border-[#e2e8f0] pt-3">
                           <MetricSummaryPill label={TEXT.memorizedPages} value={formatMetric(student.memorized)} toneClass="bg-[#f0fdf4]" />
                           <MetricSummaryPill label={TEXT.revisedPages} value={formatMetric(student.revised)} toneClass="bg-[#eff6ff]" />
                           <MetricSummaryPill label={TEXT.tiedPages} value={formatMetric(student.tied)} toneClass="bg-[#fffbeb]" />
