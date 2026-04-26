@@ -201,6 +201,7 @@ export default function EnrollmentRequestsPage() {
   const [notificationTemplates, setNotificationTemplates] = useState<EnrollmentNotificationTemplates>(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES);
   const [notificationTemplatesForm, setNotificationTemplatesForm] = useState<EnrollmentNotificationTemplates>(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES);
   const [isSavingNotificationTemplates, setIsSavingNotificationTemplates] = useState(false);
+  const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false);
   const [acceptWhatsAppMessage, setAcceptWhatsAppMessage] = useState(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES.finalAccept);
   const [provisionalWhatsAppMessage, setProvisionalWhatsAppMessage] = useState(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES.provisionalAccept);
   const [rejectWhatsAppMessage, setRejectWhatsAppMessage] = useState(DEFAULT_ENROLLMENT_NOTIFICATION_TEMPLATES.reject);
@@ -765,6 +766,13 @@ export default function EnrollmentRequestsPage() {
 								</button>
 
 								<button
+                  onClick={() => setIsTemplatesDialogOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-[#3453a7]/40 bg-white px-4 py-3 text-sm font-semibold text-[#3453a7] transition-all hover:bg-[#3453a7]/5"
+                >
+                  <span>القوالب</span>
+                </button>
+
+                <button
 									onClick={copyEnrollmentLink}
                   className="inline-flex items-center gap-2 rounded-2xl bg-[#3453a7] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#24428f] focus-visible:bg-[#24428f]"
 								>
@@ -783,46 +791,6 @@ export default function EnrollmentRequestsPage() {
 							</div>
 						</div>
 					</section>
-
-					<section className="overflow-hidden rounded-[28px] border border-[#3453a7]/15 bg-white shadow-sm">
-            <div className="border-b border-[#3453a7]/10 px-5 py-4 md:px-6">
-              <div>
-                <h2 className="text-lg font-bold text-[#1a2332]">قوالب الإشعارات</h2>
-                <p className="text-sm text-neutral-500">المتغيرات المتاحة: <span dir="ltr">&#123;student_name&#125;</span> و <span dir="ltr">&#123;circle_name&#125;</span> للقبول النهائي.</p>
-              </div>
-            </div>
-            <div className="grid gap-4 px-5 py-5 md:grid-cols-3 md:px-6">
-              <div className="grid gap-2">
-                <Label>قالب القبول النهائي</Label>
-                <textarea
-                  value={notificationTemplatesForm.finalAccept}
-                  onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, finalAccept: e.target.value }))}
-                  className="min-h-[140px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>قالب القبول المبدئي</Label>
-                <textarea
-                  value={notificationTemplatesForm.provisionalAccept}
-                  onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, provisionalAccept: e.target.value }))}
-                  className="min-h-[140px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>قالب الرفض</Label>
-                <textarea
-                  value={notificationTemplatesForm.reject}
-                  onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, reject: e.target.value }))}
-                  className="min-h-[140px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end border-t border-[#3453a7]/10 px-5 py-4 md:px-6">
-              <Button onClick={saveNotificationTemplates} disabled={isSavingNotificationTemplates} className="bg-[#3453a7] text-white hover:bg-[#24428f]">
-                {isSavingNotificationTemplates ? "جارٍ الحفظ..." : "حفظ القوالب"}
-              </Button>
-            </div>
-          </section>
 
           <section className="overflow-hidden rounded-[28px] border border-[#3453a7]/15 bg-white shadow-sm">
 						<div className="flex items-center justify-between border-b border-[#3453a7]/10 px-5 py-4 md:px-6">
@@ -1282,6 +1250,53 @@ export default function EnrollmentRequestsPage() {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+      <Dialog open={isTemplatesDialogOpen} onOpenChange={setIsTemplatesDialogOpen}>
+        <DialogContent className="max-w-5xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>قوالب الإشعارات</DialogTitle>
+            <DialogDescription>
+              المتغيرات المتاحة: <span dir="ltr">&#123;student_name&#125;</span> و <span dir="ltr">&#123;circle_name&#125;</span> للقبول النهائي.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-2">
+              <Label>قالب القبول النهائي</Label>
+              <textarea
+                value={notificationTemplatesForm.finalAccept}
+                onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, finalAccept: e.target.value }))}
+                className="min-h-[180px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>قالب القبول المبدئي</Label>
+              <textarea
+                value={notificationTemplatesForm.provisionalAccept}
+                onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, provisionalAccept: e.target.value }))}
+                className="min-h-[180px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>قالب الرفض</Label>
+              <textarea
+                value={notificationTemplatesForm.reject}
+                onChange={(e) => setNotificationTemplatesForm((current) => ({ ...current, reject: e.target.value }))}
+                className="min-h-[180px] rounded-xl border border-input bg-white px-3 py-3 text-sm shadow-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button type="button" variant="outline" onClick={() => setIsTemplatesDialogOpen(false)}>
+              إغلاق
+            </Button>
+            <Button onClick={saveNotificationTemplates} disabled={isSavingNotificationTemplates} className="bg-[#3453a7] text-white hover:bg-[#24428f]">
+              {isSavingNotificationTemplates ? "جارٍ الحفظ..." : "حفظ القوالب"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
 			<Footer />
 		</div>
