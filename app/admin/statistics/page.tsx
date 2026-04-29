@@ -10,7 +10,7 @@ import { SiteLoader } from "@/components/ui/site-loader";
 import { useAdminAuth } from "@/hooks/use-admin-auth";
 import { getStudyWeekEnd, getStudyWeekStart, isStudyDay } from "@/lib/study-calendar";
 
-type DateFilter = "today" | "currentWeek" | "currentMonth" | "all" | "custom";
+type DateFilter = "today" | "currentWeek" | "currentMonth" | "currentSemester" | "all" | "custom";
 
 type CustomDateRange = {
   start: string;
@@ -173,6 +173,7 @@ const FILTER_LABELS: Record<DateFilter, string> = {
   today: "\u0627\u0644\u064a\u0648\u0645",
   currentWeek: "\u0627\u0644\u0623\u0633\u0628\u0648\u0639 \u0627\u0644\u062d\u0627\u0644\u064a",
   currentMonth: "\u0627\u0644\u0634\u0647\u0631 \u0627\u0644\u062d\u0627\u0644\u064a",
+  currentSemester: "\u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u062d\u0627\u0644\u064a",
   all: "\u0643\u0644 \u0627\u0644\u0641\u062a\u0631\u0627\u062a",
   custom: "\u0645\u062e\u0635\u0635",
 };
@@ -950,8 +951,13 @@ export default function StatisticsPage() {
               <CircleIndicatorsCard items={topCircles} dateFilter={dateFilter} customRange={customRange} />
 
               <section className="space-y-3">
-                <div className="text-sm font-black text-[#1a2332]">{TEXT.browseCircles}</div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-black text-[#1a2332]">{TEXT.browseCircles}</div>
+                  <div className="rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-extrabold text-[#5a67b1]">
+                    {formatNumber(allCircles.length)} حلقة
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4 xl:grid-cols-4">
                   {allCircles.map((circle) => (
                     (() => {
                       const tone = getCircleCardTone(circle.name || TEXT.unknownCircle);
@@ -960,17 +966,30 @@ export default function StatisticsPage() {
                         <Link
                           key={circle.id}
                           href={`/admin/statistics/circles/${encodeURIComponent(circle.name || TEXT.unknownCircle)}`}
-                          className={`group relative overflow-hidden rounded-[28px] border p-5 transition duration-200 hover:-translate-y-1 ${tone.cardClass} ${tone.hoverClass}`}
+                          className={`group relative overflow-hidden rounded-[22px] border px-3 py-3.5 transition duration-200 hover:-translate-y-1 sm:rounded-[28px] sm:p-5 ${tone.cardClass} ${tone.hoverClass}`}
                         >
-                          <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 ${tone.glowClass}`} />
-                          <div className="relative flex items-start justify-between gap-3">
-                            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/80 shadow-sm transition group-hover:scale-105 ${tone.iconClass}`}>
-                              <BookOpen className="h-5 w-5" />
+                          <div className={`pointer-events-none absolute inset-x-0 top-0 h-16 sm:h-20 ${tone.glowClass}`} />
+                          <div className="relative flex items-center gap-3 sm:block">
+                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/85 shadow-sm transition group-hover:scale-105 sm:h-12 sm:w-12 ${tone.iconClass}`}>
+                              <BookOpen className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                             </div>
-                          </div>
-                          <div className="relative mt-6 text-right">
-                            <div className={`text-[13px] font-extrabold tracking-[0.16em] ${tone.eyebrowClass}`}>تقرير الحلقة</div>
-                            <div className="mt-2 line-clamp-2 text-lg font-black leading-8 text-[#1a2332]">{circle.name || TEXT.unknownCircle}</div>
+                            <div className="min-w-0 flex-1 text-right sm:mt-6">
+                              <div className="flex items-center justify-between gap-3 sm:items-start">
+                                <div className="min-w-0">
+                                  <div className={`text-[10px] font-extrabold tracking-[0.14em] sm:text-[13px] sm:tracking-[0.16em] ${tone.eyebrowClass}`}>تقرير الحلقة</div>
+                                  <div className="mt-1 line-clamp-2 text-sm font-black leading-6 text-[#1a2332] sm:mt-2 sm:text-lg sm:leading-8">{circle.name || TEXT.unknownCircle}</div>
+                                </div>
+                                <div className="shrink-0 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-[10px] font-extrabold text-[#5b6474] shadow-sm sm:hidden">
+                                  عرض
+                                </div>
+                              </div>
+                              <div className="mt-2 hidden items-center justify-between gap-3 sm:flex">
+                                <div className="text-xs font-bold text-[#5b6474]">عرض التقرير التفصيلي للحلقة</div>
+                                <div className="rounded-full border border-white/70 bg-white/80 px-3 py-1 text-[11px] font-extrabold text-[#5a67b1] shadow-sm transition group-hover:border-[#c9d3f3] group-hover:bg-white">
+                                  فتح التقرير
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </Link>
                       );

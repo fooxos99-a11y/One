@@ -683,7 +683,7 @@ export function GlobalStudentExamsDialog() {
                 إغلاق
               </Button>
               <Button type="button" onClick={handleConfirmFailedExamAction} disabled={isSaving} className="h-11 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]">
-                {isSaving ? "جاري الحفظ..." : "حفظ فقط"}
+                {isSaving ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </div>
           </div>

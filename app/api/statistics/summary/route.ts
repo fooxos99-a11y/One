@@ -8,7 +8,7 @@ import { getPlanForDate, groupPlansByStudent } from "@/lib/plan-history"
 import { calculatePreviousMemorizedPages, resolvePlanReviewPagesForDate, resolvePlanReviewPoolPages } from "@/lib/quran-data"
 import { applyAttendancePointsAdjustment, calculateTotalEvaluationPoints, isPassingMemorizationLevel } from "@/lib/student-attendance"
 
-type DateFilter = "today" | "currentWeek" | "currentMonth" | "all" | "custom"
+type DateFilter = "today" | "currentWeek" | "currentMonth" | "currentSemester" | "all" | "custom"
 
 type CustomDateRange = {
   start: string
@@ -315,6 +315,13 @@ export async function GET(request: NextRequest) {
       dailyReportsQuery = dailyReportsQuery.gte("report_date", formatDateForQuery(start)).lte("report_date", formatDateForQuery(end))
     }
 
+    const effectiveStart = filter === "currentSemester" ? activeSemesterStartDate ?? start : start
+
+    if (filter !== "all") {
+      attendanceQuery = attendanceQuery.gte("date", formatDateForQuery(effectiveStart)).lte("date", formatDateForQuery(end))
+      dailyReportsQuery = dailyReportsQuery.gte("report_date", formatDateForQuery(effectiveStart)).lte("report_date", formatDateForQuery(end))
+    }
+
     const [attendanceResult, dailyReportsResult] = await Promise.all([attendanceQuery, dailyReportsQuery])
     if (attendanceResult.error) throw attendanceResult.error
 
@@ -334,7 +341,7 @@ export async function GET(request: NextRequest) {
     )
     const studyDayCount = filter === "all"
       ? countStudyDaysInRange(activeSemesterStartDate ?? start, end)
-      : countStudyDaysInRange(start, end)
+      : countStudyDaysInRange(effectiveStart, end)
 
     const allCircles = [...circles].sort((left, right) => (left.name || "").localeCompare(right.name || "", "ar"))
     const studentNames = new Map(students.map((student) => [student.id, student.name?.trim() || TEXT.unknownStudent]))

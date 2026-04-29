@@ -11,7 +11,7 @@ import { applyAttendancePointsAdjustment, calculateTotalEvaluationPoints, isPass
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-type DateFilter = "today" | "currentWeek" | "currentMonth" | "all" | "custom"
+type DateFilter = "today" | "currentWeek" | "currentMonth" | "currentSemester" | "all" | "custom"
 
 type CustomDateRange = {
   start: string
@@ -306,6 +306,8 @@ export async function GET(request: NextRequest) {
     const circleStudentIds = new Set(circleStudents.map((student) => student.id))
     const resolvedCircleName = circleStudents[0]?.halaqah?.trim() || circleName || TEXT.unknownCircle
 
+    const effectiveStart = filter === "currentSemester" ? activeSemesterStartDate ?? start : start
+
     const [plansResult, attendanceResult, dailyReportsResult] = await Promise.all([
       plansQuery,
       (async () => {
@@ -323,14 +325,14 @@ export async function GET(request: NextRequest) {
         }
 
         if (filter !== "all") {
-          attendanceQuery = attendanceQuery.gte("date", formatDateForQuery(start)).lte("date", formatDateForQuery(end))
+          attendanceQuery = attendanceQuery.gte("date", formatDateForQuery(effectiveStart)).lte("date", formatDateForQuery(end))
         }
 
         return attendanceQuery
       })(),
       (async () => {
         if (filter !== "all") {
-          dailyReportsQuery = dailyReportsQuery.gte("report_date", formatDateForQuery(start)).lte("report_date", formatDateForQuery(end))
+          dailyReportsQuery = dailyReportsQuery.gte("report_date", formatDateForQuery(effectiveStart)).lte("report_date", formatDateForQuery(end))
         }
 
         return dailyReportsQuery
@@ -359,7 +361,7 @@ export async function GET(request: NextRequest) {
         normalizeCircleName(record.halaqah) === normalizedCircleName,
     )
 
-    const studyDates = getStudyDatesInRange(filter === "all" ? activeSemesterStartDate ?? start : start, end)
+    const studyDates = getStudyDatesInRange(filter === "all" ? activeSemesterStartDate ?? start : effectiveStart, end)
     const studentStats = new Map<string, StudentIndicatorSummary>()
     const dailyReportsByStudentDate = new Map<string, DailyReportRow>()
     const memorizedPoolByStudent = new Map<string, number>()

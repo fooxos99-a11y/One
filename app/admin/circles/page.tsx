@@ -23,6 +23,7 @@ import { TeacherAttendanceModal } from "@/components/teacher-attendance-modal"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 
 interface Circle {
+  id: string
   name: string
   studentCount: number
 }
@@ -121,7 +122,7 @@ export default function CircleManagement() {
       const response = await fetch("/api/circles", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ current_name: editingCircle.name, new_name: editedCircleName }),
+        body: JSON.stringify({ circle_id: editingCircle.id, current_name: editingCircle.name, new_name: editedCircleName }),
       })
 
       const data = await response.json().catch(() => null)

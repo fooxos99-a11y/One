@@ -205,6 +205,14 @@ function isScheduleOverdue(schedule: ExamScheduleRow) {
   return schedule.status === "scheduled" && schedule.exam_date < getTodayDate()
 }
 
+function normalizeExamStudentRelation(value: ExamRow["students"]) {
+  if (Array.isArray(value)) {
+    return value[0] || null
+  }
+
+  return value || null
+}
+
 export default function AdminExamsPage() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة الاختبارات")
   const { isReady: isWhatsAppReady, isLoading: isWhatsAppStatusLoading } = useWhatsAppStatus()
@@ -217,6 +225,7 @@ export default function AdminExamsPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
   const [isSchedulesOverviewOpen, setIsSchedulesOverviewOpen] = useState(false)
+  const [isExamResultsOpen, setIsExamResultsOpen] = useState(false)
   const [tableMissing, setTableMissing] = useState(false)
   const [schedulesTableMissing, setSchedulesTableMissing] = useState(false)
   const [circles, setCircles] = useState<Circle[]>([])
@@ -236,6 +245,14 @@ export default function AdminExamsPage() {
   const [overviewPage, setOverviewPage] = useState(1)
   const [isOverviewSchedulesLoading, setIsOverviewSchedulesLoading] = useState(false)
   const [overviewSchedulesTableMissing, setOverviewSchedulesTableMissing] = useState(false)
+  const [resultsCircle, setResultsCircle] = useState("")
+  const [resultsStudentId, setResultsStudentId] = useState("")
+  const [resultsStudents, setResultsStudents] = useState<Student[]>([])
+  const [resultsExams, setResultsExams] = useState<ExamRow[]>([])
+  const [isResultsStudentsLoading, setIsResultsStudentsLoading] = useState(false)
+  const [isResultsExamsLoading, setIsResultsExamsLoading] = useState(false)
+  const [resultsTableMissing, setResultsTableMissing] = useState(false)
+  const [resultsError, setResultsError] = useState("")
 
   useEffect(() => {
     async function bootstrap() {
@@ -433,6 +450,80 @@ export default function AdminExamsPage() {
     setOverviewPage(1)
   }, [overviewCircleFilter, overviewDateFilter, isSchedulesOverviewOpen])
 
+  useEffect(() => {
+    if (!isExamResultsOpen) {
+      return
+    }
+
+    if (!resultsCircle) {
+      setResultsStudents([])
+      setResultsStudentId("")
+      setResultsExams([])
+      setResultsError("")
+      return
+    }
+
+    async function loadResultsStudents() {
+      try {
+        setIsResultsStudentsLoading(true)
+        setResultsError("")
+        setResultsStudentId("")
+        setResultsExams([])
+
+        const response = await fetch(`/api/students?circle=${encodeURIComponent(resultsCircle)}`, { cache: "no-store" })
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "تعذر تحميل طلاب الحلقة")
+        }
+
+        setResultsStudents((data.students || []) as Student[])
+      } catch (error) {
+        console.error("[admin-exams] load results students:", error)
+        setResultsStudents([])
+        setResultsError(error instanceof Error ? error.message : "حدث خطأ أثناء تحميل الطلاب")
+      } finally {
+        setIsResultsStudentsLoading(false)
+      }
+    }
+
+    void loadResultsStudents()
+  }, [isExamResultsOpen, resultsCircle])
+
+  useEffect(() => {
+    if (!isExamResultsOpen || !resultsStudentId) {
+      setResultsExams([])
+      setResultsTableMissing(false)
+      return
+    }
+
+    async function loadStudentExamResults() {
+      try {
+        setIsResultsExamsLoading(true)
+        setResultsError("")
+
+        const response = await fetch(`/api/exams?student_id=${encodeURIComponent(resultsStudentId)}`, { cache: "no-store" })
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "تعذر تحميل نتائج الاختبارات")
+        }
+
+        setResultsExams((data.exams || []) as ExamRow[])
+        setResultsTableMissing(Boolean(data.tableMissing))
+      } catch (error) {
+        console.error("[admin-exams] load results exams:", error)
+        setResultsExams([])
+        setResultsTableMissing(false)
+        setResultsError(error instanceof Error ? error.message : "حدث خطأ أثناء تحميل النتائج")
+      } finally {
+        setIsResultsExamsLoading(false)
+      }
+    }
+
+    void loadStudentExamResults()
+  }, [isExamResultsOpen, resultsStudentId])
+
   const overviewDateSchedules = useMemo(() => {
     if (!overviewDateFilter) {
       return []
@@ -446,6 +537,18 @@ export default function AdminExamsPage() {
     const startIndex = (overviewPage - 1) * OVERVIEW_PAGE_SIZE
     return overviewDateSchedules.slice(startIndex, startIndex + OVERVIEW_PAGE_SIZE)
   }, [overviewDateSchedules, overviewPage])
+  const selectedResultsStudent = useMemo(() => {
+    return resultsStudents.find((student) => student.id === resultsStudentId) || null
+  }, [resultsStudentId, resultsStudents])
+  const sortedResultsExams = useMemo(() => {
+    return [...resultsExams].sort((left, right) => {
+      if (left.exam_date !== right.exam_date) {
+        return right.exam_date.localeCompare(left.exam_date)
+      }
+
+      return right.created_at.localeCompare(left.created_at)
+    })
+  }, [resultsExams])
 
   const handleSettingsChange = (field: keyof SettingsForm, value: string) => {
     setSettingsForm((current) => ({ ...current, [field]: value }))
@@ -658,6 +761,11 @@ export default function AdminExamsPage() {
             <Button type="button" onClick={() => setIsSchedulesOverviewOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
               <CalendarDays className="me-2 h-4 w-4" />
               المواعيد
+            </Button>
+
+            <Button type="button" onClick={() => setIsExamResultsOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
+              <BellRing className="me-2 h-4 w-4" />
+              نتائج الاختبارات
             </Button>
 
             <Button type="button" onClick={() => setIsSettingsOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
@@ -992,6 +1100,146 @@ export default function AdminExamsPage() {
 
                 <div className="flex justify-end border-t border-[#e5edf6] px-4 py-4 sm:px-6">
                   <Button type="button" variant="outline" onClick={() => setIsSchedulesOverviewOpen(false)} className="h-11 rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff]">
+                    إغلاق
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isExamResultsOpen} onOpenChange={setIsExamResultsOpen}>
+            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-4xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
+              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white sm:max-h-[90vh]">
+                <DialogHeader className="border-b border-[#e5edf6] px-4 py-4 sm:px-6 sm:py-5">
+                  <DialogTitle className="flex w-full items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
+                    <BellRing className="h-5 w-5 text-[#3453a7]" />
+                    نتائج الاختبارات
+                  </DialogTitle>
+                  <DialogDescription className="pt-2 text-right text-sm font-semibold leading-7 text-[#64748b]">
+                    اختر الحلقة ثم الطالب لعرض جميع اختباراته السابقة سواء كانت كأحزاب أو كأجزاء مع النتيجة.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 text-right">
+                      <Label className="text-sm font-black text-[#334155]">الحلقة</Label>
+                      <Select
+                        value={resultsCircle}
+                        onValueChange={(value) => {
+                          setResultsCircle(value)
+                          setResultsError("")
+                        }}
+                        dir="rtl"
+                      >
+                        <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
+                          <SelectValue placeholder="اختر الحلقة" />
+                        </SelectTrigger>
+                        <SelectContent dir="rtl">
+                          {circles.map((circle) => (
+                            <SelectItem key={`results-circle-${circle.id}`} value={circle.name}>{circle.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2 text-right">
+                      <Label className="text-sm font-black text-[#334155]">الطالب</Label>
+                      <Select value={resultsStudentId} onValueChange={setResultsStudentId} dir="rtl" disabled={!resultsCircle || isResultsStudentsLoading || resultsStudents.length === 0}>
+                        <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white disabled:opacity-70">
+                          <SelectValue placeholder={isResultsStudentsLoading ? "جاري تحميل الطلاب..." : "اختر الطالب"} />
+                        </SelectTrigger>
+                        <SelectContent dir="rtl">
+                          {resultsStudents.map((student) => (
+                            <SelectItem key={`results-student-${student.id}`} value={student.id}>{student.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {selectedResultsStudent ? (
+                    <div className="rounded-[24px] border border-[#e5edf6] bg-[#fafcff] px-4 py-4 text-right">
+                      <div className="text-base font-black text-[#1a2332]">{selectedResultsStudent.name}</div>
+                      <div className="mt-1 text-sm font-semibold text-[#64748b]">{selectedResultsStudent.halaqah}</div>
+                    </div>
+                  ) : null}
+
+                  {resultsError ? (
+                    <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-4 text-right text-sm font-bold leading-7 text-red-700">
+                      {resultsError}
+                    </div>
+                  ) : null}
+
+                  {resultsTableMissing ? (
+                    <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-right text-sm font-bold leading-7 text-amber-800">
+                      جدول الاختبارات غير موجود بعد. شغّل ملف 042_create_student_exams.sql في قاعدة البيانات أولاً.
+                    </div>
+                  ) : !resultsCircle ? (
+                    <div className="rounded-[24px] border border-dashed border-[#d7e3f2] px-4 py-8 text-center text-sm font-bold text-[#7b8794]">
+                      اختر الحلقة أولاً.
+                    </div>
+                  ) : isResultsStudentsLoading ? (
+                    <div className="flex min-h-[220px] items-center justify-center">
+                      <SiteLoader />
+                    </div>
+                  ) : resultsStudents.length === 0 ? (
+                    <div className="rounded-[24px] border border-dashed border-[#d7e3f2] px-4 py-8 text-center text-sm font-bold text-[#7b8794]">
+                      لا يوجد طلاب في الحلقة المختارة.
+                    </div>
+                  ) : !resultsStudentId ? (
+                    <div className="rounded-[24px] border border-dashed border-[#d7e3f2] px-4 py-8 text-center text-sm font-bold text-[#7b8794]">
+                      اختر الطالب لعرض نتائجه.
+                    </div>
+                  ) : isResultsExamsLoading ? (
+                    <div className="flex min-h-[220px] items-center justify-center">
+                      <SiteLoader />
+                    </div>
+                  ) : sortedResultsExams.length > 0 ? (
+                    <div className="overflow-x-auto rounded-[24px] border border-[#ebeff5]">
+                      <Table className="min-w-[760px]">
+                        <TableHeader>
+                          <TableRow className="bg-[#f8fafc] hover:bg-[#f8fafc]">
+                            <TableHead className="text-right font-black text-[#475569]">الاختبار</TableHead>
+                            <TableHead className="text-right font-black text-[#475569]">الوحدة</TableHead>
+                            <TableHead className="text-right font-black text-[#475569]">التاريخ</TableHead>
+                            <TableHead className="text-right font-black text-[#475569]">الدرجة</TableHead>
+                            <TableHead className="text-right font-black text-[#475569]">النتيجة</TableHead>
+                            <TableHead className="text-right font-black text-[#475569]">المختبر</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortedResultsExams.map((exam) => {
+                            const examStudent = normalizeExamStudentRelation(exam.students)
+                            const portionTypeLabel = exam.portion_type === "hizb" ? "حزب" : "جزء"
+
+                            return (
+                              <TableRow key={`exam-result-${exam.id}`}>
+                                <TableCell className="text-right font-bold text-[#1f2937]">{exam.exam_portion_label}</TableCell>
+                                <TableCell className="text-right text-sm font-bold text-[#475569]">{portionTypeLabel}</TableCell>
+                                <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.exam_date}</TableCell>
+                                <TableCell className="text-right text-sm font-black text-[#1a2332]">{exam.final_score}</TableCell>
+                                <TableCell className="text-right">
+                                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${exam.passed ? "bg-[#ecfdf5] text-[#166534]" : "bg-[#fef2f2] text-[#b91c1c]"}`}>
+                                    {exam.passed ? "ناجح" : "راسب"}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.tested_by_name || examStudent?.name || "-"}</TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="rounded-[24px] border border-dashed border-[#d7e3f2] px-4 py-8 text-center text-sm font-bold text-[#7b8794]">
+                      لا توجد اختبارات مسجلة لهذا الطالب.
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end border-t border-[#e5edf6] px-4 py-4 sm:px-6">
+                  <Button type="button" variant="outline" onClick={() => setIsExamResultsOpen(false)} className="h-11 rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff]">
                     إغلاق
                   </Button>
                 </div>

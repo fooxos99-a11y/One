@@ -107,10 +107,11 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
+    const circleId = String(body.circle_id || "").trim()
     const currentName = normalizeCircleName(body.current_name)
     const nextName = normalizeCircleName(body.new_name)
 
-    if (!currentName || !nextName) {
+    if ((!circleId && !currentName) || !nextName) {
       return NextResponse.json({ error: "الاسم الحالي والجديد مطلوبان" }, { status: 400 })
     }
 
@@ -120,16 +121,17 @@ export async function PATCH(request: Request) {
 
     const supabase = createAdminClient()
 
-    const { data: existingCircle, error: existingCircleError } = await supabase
-      .from("circles")
-      .select("id")
-      .eq("name", currentName)
-      .maybeSingle()
+    let existingCircleQuery = supabase.from("circles").select("id, name")
+    existingCircleQuery = circleId ? existingCircleQuery.eq("id", circleId) : existingCircleQuery.eq("name", currentName)
+
+    const { data: existingCircle, error: existingCircleError } = await existingCircleQuery.maybeSingle()
 
     if (existingCircleError) throw existingCircleError
     if (!existingCircle) {
       return NextResponse.json({ error: "الحلقة غير موجودة" }, { status: 404 })
     }
+
+    const resolvedCurrentName = normalizeCircleName(existingCircle.name)
 
     const { data: duplicateCircle, error: duplicateError } = await supabase
       .from("circles")
@@ -138,11 +140,11 @@ export async function PATCH(request: Request) {
       .maybeSingle()
 
     if (duplicateError) throw duplicateError
-    if (duplicateCircle) {
+    if (duplicateCircle && duplicateCircle.id !== existingCircle.id) {
       return NextResponse.json({ error: "حلقة بهذا الاسم موجودة بالفعل" }, { status: 400 })
     }
 
-    const { error: updateCircleError } = await supabase.from("circles").update({ name: nextName }).eq("name", currentName)
+    const { error: updateCircleError } = await supabase.from("circles").update({ name: nextName }).eq("id", existingCircle.id)
     if (updateCircleError) throw updateCircleError
 
     const tablesToSync = [
@@ -154,7 +156,7 @@ export async function PATCH(request: Request) {
     ]
 
     for (const tableName of tablesToSync) {
-      const { error } = await supabase.from(tableName).update({ halaqah: nextName }).eq("halaqah", currentName)
+      const { error } = await supabase.from(tableName).update({ halaqah: nextName }).eq("halaqah", resolvedCurrentName)
       if (error) {
         throw error
       }
