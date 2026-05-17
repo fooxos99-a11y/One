@@ -860,7 +860,6 @@ export function WhatsAppSendContent({
                         className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
                       >
                         القوالب
-                        {readyMessages.length > 0 ? <span className="ms-2 text-xs text-[#6b7fc0]">{readyMessages.length}</span> : null}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent align="start" side="bottom" className="w-[min(92vw,30rem)] space-y-3 rounded-2xl border border-[#3453a7]/15 bg-white p-4 text-right shadow-[0_16px_40px_rgba(19,39,89,0.12)]">
@@ -909,14 +908,16 @@ export function WhatsAppSendContent({
                     </PopoverContent>
                   </Popover>
                 ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={toggleRepliesView}
-                  className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
-                >
-                  {isRepliesView ? "عرض الإرسال" : "عرض الردود"}
-                </Button>
+                {displayMode !== "inline" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={toggleRepliesView}
+                    className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                  >
+                    {isRepliesView ? "عرض الإرسال" : "عرض الردود"}
+                  </Button>
+                ) : null}
               </div>
             </div>
 
