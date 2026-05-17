@@ -7,15 +7,12 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status"
-import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert, X, Search, CheckCheck, Trash2, Mic } from "lucide-react"
+import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert, Search, CheckCheck, Trash2, Mic, Paperclip } from "lucide-react"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { formatGuardianPhoneForDisplay } from "@/lib/phone-number"
@@ -332,13 +329,6 @@ export function WhatsAppSendContent({
       await fetchReadyMessages()
     } catch {
       return
-    }
-  }
-
-  const clearImageSelection = () => {
-    setImagePayload(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
     }
   }
 
@@ -750,7 +740,10 @@ export function WhatsAppSendContent({
         })
 
         setMessage("")
-        clearImageSelection()
+        setImagePayload(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""
+        }
         setSelectedRecipients([])
       } else {
         toast({
@@ -859,6 +852,64 @@ export function WhatsAppSendContent({
               </div>
               {displayMode !== "inline" ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                {!isRepliesView ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      >
+                        القوالب
+                        {readyMessages.length > 0 ? <span className="ms-2 text-xs text-[#6b7fc0]">{readyMessages.length}</span> : null}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" side="bottom" className="w-[min(92vw,30rem)] space-y-3 rounded-2xl border border-[#3453a7]/15 bg-white p-4 text-right shadow-[0_16px_40px_rgba(19,39,89,0.12)]">
+                      <div className="space-y-1">
+                        <div className="text-sm font-bold text-[#1a2332]">القوالب</div>
+                        <div className="text-xs text-neutral-500">أضف رسالة جاهزة ثم أدرجها داخل النص الحالي.</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          placeholder="اكتب نص لإضافته كرسالة جاهزة"
+                          value={quickText}
+                          onChange={(event) => setQuickText(event.target.value)}
+                          className="text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600"
+                          onClick={handleAddReadyMessage}
+                        >
+                          إضافة
+                        </Button>
+                      </div>
+                      <div className="max-h-72 space-y-2 overflow-y-auto">
+                        {isLoadingReady ? (
+                          <div className="py-3"><SiteLoader /></div>
+                        ) : readyMessages.length === 0 ? (
+                          <div className="text-xs text-gray-400">لا توجد قوالب جاهزة</div>
+                        ) : (
+                          readyMessages.map((msg) => (
+                            <div key={msg.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <div className="mb-2 text-xs leading-6 text-gray-700">{msg.text}</div>
+                              <div className="flex items-center gap-2">
+                                <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
+                                  إدراج
+                                </Button>
+                                <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteReadyMessage(msg.id)}>
+                                  حذف
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
@@ -990,165 +1041,42 @@ export function WhatsAppSendContent({
               </div>
             ) : (
             <div className="flex flex-col gap-6">
-              <div className="order-2">
+              <div className="order-1">
                 <Card className="border-2 border-[#3453a7]/20">
                   <CardHeader>
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-[#1a2332]">كتابة الرسالة</CardTitle>
-                      <HoverCard>
-                        <HoverCardTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#3453a7]/20 bg-[#3453a7]/5 text-[#3453a7] transition hover:bg-[#3453a7]/10"
-                            aria-label="عرض متغيرات الرسالة"
-                          >
-                            <CircleAlert className="h-4 w-4" />
-                          </button>
-                        </HoverCardTrigger>
-                        <HoverCardContent align="end" className="w-80 border border-[#3453a7]/15 bg-white text-right shadow-xl">
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm font-bold text-[#1a2332]">المتغيرات المتاحة</p>
-                              <p className="mt-1 text-xs text-gray-500">تُستبدل تلقائياً حسب نوع المستلم المحدد.</p>
-                            </div>
-                            <div className="space-y-2">
-                              {TEMPLATE_VARIABLES.map((variable) => (
-                                <div key={variable.token} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span className="text-xs font-bold text-[#3453a7]">{variable.token}</span>
-                                    <span className="text-xs text-[#1a2332]">{variable.label}</span>
-                                  </div>
-                                  <p className="mt-1 text-xs text-gray-500">مثال: {variable.sample}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </HoverCardContent>
-                      </HoverCard>
-                    </div>
+                    <CardTitle className="text-[#1a2332]">اختيار المستلمين</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="message">نص الرسالة</Label>
-                      <Textarea
+                    <input
+                      ref={fileInputRef}
+                      id="whatsapp-image"
+                      type="file"
+                      accept={OUTBOUND_ATTACHMENT_MIME_TYPES.join(",")}
+                      onChange={handleImageSelection}
+                      className="hidden"
+                    />
+
+                    <div className="flex items-center gap-3 rounded-2xl border border-[#3453a7]/15 bg-[#f8fbff] px-3 py-3">
+                      <Input
                         id="message"
-                        placeholder="اكتب رسالتك هنا...."
+                        placeholder="اكتب رسالتك هنا..."
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
-                        rows={8}
-                        className="resize-none"
+                        className="h-11 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                       />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => fileInputRef.current?.click()}
+                        title={imagePayload?.fileName || "رفع ملف"}
+                        className={`h-11 w-11 rounded-2xl border-[#3453a7]/40 bg-white text-[#3453a7] ${imagePayload ? "border-[#3453a7] bg-[#edf3ff]" : ""}`}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-dashed border-[#3453a7]/25 bg-[#f8fbff] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <Label htmlFor="whatsapp-image" className="text-sm font-semibold text-[#1a2332]">إرفاق ملف</Label>
-                        </div>
-                        {imagePayload ? (
-                          <button
-                            type="button"
-                            onClick={clearImageSelection}
-                            aria-label="إزالة الملف"
-                            className="text-red-600 transition-colors hover:text-red-700"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        ) : null}
-                      </div>
-
-                      <input
-                        ref={fileInputRef}
-                        id="whatsapp-image"
-                        type="file"
-                        accept={OUTBOUND_ATTACHMENT_MIME_TYPES.join(",")}
-                        onChange={handleImageSelection}
-                        className="hidden"
-                      />
-
-                      <div className="flex items-center gap-3 rounded-xl border border-[#3453a7]/15 bg-white px-3 py-3">
-                        <div className="min-w-0 flex-1 text-sm text-[#1a2332]">
-                          <span className="block truncate">{imagePayload?.fileName || "لا يوجد ملف محدد"}</span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-700 whitespace-nowrap"
-                        >
-                          رفع
-                        </Button>
-                      </div>
-
-                      {imagePayload && OUTBOUND_IMAGE_MIME_TYPES.includes(imagePayload.mimeType as (typeof OUTBOUND_IMAGE_MIME_TYPES)[number]) ? (
-                        <div className="overflow-hidden rounded-2xl border border-[#3453a7]/15 bg-white">
-                          <img src={imagePayload.previewUrl} alt="معاينة الصورة" className="h-56 w-full object-cover" />
-                        </div>
-                      ) : imagePayload ? (
-                        <div className="rounded-2xl border border-[#3453a7]/15 bg-white px-4 py-4 text-sm text-[#1a2332]">
-                          تم اختيار ملف PDF: {imagePayload.fileName}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-col gap-3 rounded-2xl border border-[#3453a7]/15 bg-[#f8fbff] p-4 sm:flex-row sm:items-start sm:justify-between">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="text-sm h-10 rounded-lg border-[#3453a7]/50 bg-white px-4 text-[#3453a7]"
-                          >
-                            القوالب
-                            {readyMessages.length > 0 ? <span className="ms-2 text-xs text-[#6b7fc0]">{readyMessages.length}</span> : null}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" side="top" className="w-[min(92vw,30rem)] space-y-3 rounded-2xl border border-[#3453a7]/15 bg-white p-4 text-right shadow-[0_16px_40px_rgba(19,39,89,0.12)]">
-                          <div className="space-y-1">
-                            <div className="text-sm font-bold text-[#1a2332]">القوالب</div>
-                            <div className="text-xs text-neutral-500">أضف رسالة جاهزة ثم أدرجها داخل النص الحالي.</div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="text"
-                              placeholder="اكتب نص لإضافته كرسالة جاهزة"
-                              value={quickText}
-                              onChange={(event) => setQuickText(event.target.value)}
-                              className="text-xs"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600"
-                              onClick={handleAddReadyMessage}
-                            >
-                              إضافة
-                            </Button>
-                          </div>
-                          <div className="max-h-72 space-y-2 overflow-y-auto">
-                            {isLoadingReady ? (
-                              <div className="py-3"><SiteLoader /></div>
-                            ) : readyMessages.length === 0 ? (
-                              <div className="text-xs text-gray-400">لا توجد قوالب جاهزة</div>
-                            ) : (
-                              readyMessages.map((msg) => (
-                                <div key={msg.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                  <div className="mb-2 text-xs leading-6 text-gray-700">{msg.text}</div>
-                                  <div className="flex items-center gap-2">
-                                    <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
-                                      إدراج
-                                    </Button>
-                                    <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteReadyMessage(msg.id)}>
-                                      حذف
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-
+                    <div className="flex flex-col gap-3 rounded-2xl border border-[#3453a7]/15 bg-[#f8fbff] p-4 sm:flex-row sm:items-center sm:justify-between">
                       {sendResults ? (
                         <div className="flex flex-wrap items-center gap-4 text-sm">
                           <div className="flex items-center gap-2 text-green-600">
@@ -1160,28 +1088,18 @@ export function WhatsAppSendContent({
                             <span>قيد الانتظار {sendResults.pending}</span>
                           </div>
                         </div>
-                      ) : null}
+                      ) : <div />}
+
+                      <Button
+                        onClick={handleSendMessages}
+                        disabled={isSending || isWhatsAppStatusLoading || selectedRecipients.length === 0 || (!message.trim() && !imagePayload)}
+                        variant="outline"
+                        className="w-full text-sm h-9 rounded-lg border-[#3453a7]/50 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] !text-white hover:brightness-105 hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
+                      >
+                        {isSending ? "جاري الإرسال" : <><Send className="w-4 h-4 ml-2" />إرسال</>}
+                      </Button>
                     </div>
 
-                    <Button
-                      onClick={handleSendMessages}
-                      disabled={isSending || isWhatsAppStatusLoading || selectedRecipients.length === 0 || (!message.trim() && !imagePayload)}
-                      variant="outline"
-                      className="w-full text-sm h-9 rounded-lg border-[#3453a7]/50 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] !text-white hover:brightness-105 hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60"
-                    >
-                      {isSending ? "جاري الإرسال" : <><Send className="w-4 h-4 ml-2" />إرسال</>}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="order-1">
-                <Card className="border-2 border-[#3453a7]/20">
-                  <CardHeader>
-                    <CardTitle className="text-[#1a2332]">اختيار المستلمين</CardTitle>
-                    <CardDescription>اختر الفئة ثم حدّد الأرقام التي تريد الإرسال لها.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-[220px_220px_minmax(0,1fr)_auto] gap-3">
                       <Select value={selectedRecipientGroup} onValueChange={handleChangeRecipientGroup}>
                         <SelectTrigger className="w-full">
