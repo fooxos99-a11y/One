@@ -97,7 +97,15 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
   }
 }
 
-function getStatusUi(status: WhatsAppStatusResponse, isStartingWorker: boolean) {
+function getStatusUi(status: WhatsAppStatusResponse, isStartingWorker: boolean, startupError: string | null) {
+  if (startupError) {
+    return {
+      label: "تعذر تشغيل العامل المحلي",
+      tone: "bg-rose-50 text-rose-700 border-rose-200",
+      description: startupError,
+    }
+  }
+
   if (isStartingWorker) {
     return {
       label: "جاري تشغيل عامل واتساب المحلي",
@@ -210,9 +218,10 @@ export default function WhatsAppQrPage() {
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isRefreshingQr, setIsRefreshingQr] = useState(false)
   const [isStartingWorker, setIsStartingWorker] = useState(false)
+  const [startupError, setStartupError] = useState<string | null>(null)
   const hasAttemptedAutoStartRef = useRef(false)
 
-  const statusUi = getStatusUi(status, isStartingWorker)
+  const statusUi = getStatusUi(status, isStartingWorker, startupError)
   const isConnected = status.ready && status.authenticated && status.status === "connected"
   const canDisconnect = isConnected && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed, isStartingWorker)
@@ -266,6 +275,9 @@ export default function WhatsAppQrPage() {
       const data = (await response.json()) as WhatsAppStatusResponse
       setStatus({ ...DEFAULT_STATUS, ...data })
       setImageFailed(false)
+      if (data.workerOnline) {
+        setStartupError(null)
+      }
     } catch (error) {
       if (shouldLogStatusFetchError(error)) {
         console.error("[whatsapp-qr] fetch status:", error)
@@ -289,26 +301,32 @@ export default function WhatsAppQrPage() {
     void fetchStatus()
   }, [router])
 
-    useEffect(() => {
-      if (authLoading || !authVerified || status.workerOnline || hasAttemptedAutoStartRef.current) {
+  useEffect(() => {
+    if (authLoading || !authVerified || status.workerOnline || hasAttemptedAutoStartRef.current) {
+      return
+    }
+
+    hasAttemptedAutoStartRef.current = true
+    void ensureWorkerStarted().then((result) => {
+      if (result.success) {
+        setStartupError(null)
+        void fetchStatus({ silent: true })
         return
       }
 
-      hasAttemptedAutoStartRef.current = true
-      void ensureWorkerStarted().then((result) => {
-        if (result.success) {
-          void fetchStatus({ silent: true })
-        }
-      })
-    }, [authLoading, authVerified, status.workerOnline])
+      setStartupError(result.error)
+    })
+  }, [authLoading, authVerified, status.workerOnline])
 
   const handleStartWorker = async () => {
     const result = await ensureWorkerStarted()
     if (!result.success) {
+      setStartupError(result.error)
       await alertDialog(result.error, "تعذر التشغيل")
       return
     }
 
+    setStartupError(null)
     await alertDialog(result.message, "تم")
     await fetchStatus()
   }

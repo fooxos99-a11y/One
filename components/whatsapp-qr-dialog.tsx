@@ -106,7 +106,14 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
   }
 }
 
-function getStatusUi(status: WhatsAppStatusResponse, isStartingWorker: boolean) {
+function getStatusUi(status: WhatsAppStatusResponse, isStartingWorker: boolean, startupError: string | null) {
+  if (startupError) {
+    return {
+      label: "تعذر تشغيل العامل المحلي",
+      description: startupError,
+    }
+  }
+
   if (isStartingWorker) {
     return {
       label: "جاري تشغيل عامل واتساب المحلي",
@@ -193,9 +200,10 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
   const [imageFailed, setImageFailed] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isStartingWorker, setIsStartingWorker] = useState(false)
+  const [startupError, setStartupError] = useState<string | null>(null)
   const hasAttemptedAutoStartRef = useRef(false)
 
-  const statusUi = useMemo(() => getStatusUi(status, isStartingWorker), [isStartingWorker, status])
+  const statusUi = useMemo(() => getStatusUi(status, isStartingWorker, startupError), [isStartingWorker, startupError, status])
   const isConnected = status.workerOnline && status.ready && status.authenticated && status.status === "connected"
   const canDisconnect = isConnected && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed, isStartingWorker)
@@ -249,6 +257,9 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
       const data = (await response.json()) as WhatsAppStatusResponse
       setStatus({ ...DEFAULT_STATUS, ...data })
       setImageFailed(false)
+      if (data.workerOnline) {
+        setStartupError(null)
+      }
     } catch (error) {
       if (shouldLogStatusFetchError(error)) {
         console.error("[whatsapp-qr-dialog] fetch status:", error)
@@ -264,6 +275,7 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
     if (!open) {
       hasAttemptedAutoStartRef.current = false
       setIsStartingWorker(false)
+      setStartupError(null)
       return
     }
 
@@ -278,26 +290,32 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
     void fetchStatus()
   }, [open, initialStatus])
 
-    useEffect(() => {
-      if (!open || status.workerOnline || hasAttemptedAutoStartRef.current) {
+  useEffect(() => {
+    if (!open || status.workerOnline || hasAttemptedAutoStartRef.current) {
+      return
+    }
+
+    hasAttemptedAutoStartRef.current = true
+    void ensureWorkerStarted().then((result) => {
+      if (result.success) {
+        setStartupError(null)
+        void fetchStatus({ silent: true })
         return
       }
 
-      hasAttemptedAutoStartRef.current = true
-      void ensureWorkerStarted().then((result) => {
-        if (result.success) {
-          void fetchStatus({ silent: true })
-        }
-      })
-    }, [open, status.workerOnline])
+      setStartupError(result.error)
+    })
+  }, [open, status.workerOnline])
 
   const handleStartWorker = async () => {
     const result = await ensureWorkerStarted()
     if (!result.success) {
+      setStartupError(result.error)
       await alertDialog(result.error, "تعذر التشغيل")
       return
     }
 
+    setStartupError(null)
     await alertDialog(result.message, "تم")
     await fetchStatus()
   }
