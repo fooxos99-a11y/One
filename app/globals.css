@@ -23,8 +23,8 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: #d8e4fb;
+  --input: #d8e4fb;
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -38,8 +38,22 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-border: #d8e4fb;
   --sidebar-ring: oklch(0.708 0 0);
+  --header-scrolled-accent: #263d75;
+  --header-scrolled-background: rgba(255, 255, 255, 0.95);
+  --header-scrolled-border: #dce6f8;
+  --header-hover-surface: rgba(52, 83, 167, 0.1);
+  --button-gradient: linear-gradient(135deg, #24428f 0%, #3453a7 55%, #4f73d1 100%);
+  --button-shadow: rgba(52, 83, 167, 0.16);
+  --button-outline-border: rgba(52, 83, 167, 0.2);
+  --button-outline-text: #274187;
+  --button-outline-hover: #f4f7ff;
+  --button-secondary-bg: #eef3ff;
+  --button-secondary-text: #274187;
+  --button-secondary-hover: #dde8ff;
+  --button-ghost-hover: #eef3ff;
+  --button-ghost-text: #274187;
   /* Updating challenge colors to match site theme (beige and green) */
   --challenge-primary: #20335f;
   --challenge-secondary: #3453a7;
@@ -159,8 +173,67 @@
 }
 
 @layer components {
+  .theme-admin-card {
+    border-color: color-mix(in srgb, var(--border) 82%, white 18%);
+    background: white;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+  }
+
+  .theme-admin-muted-surface {
+    border-color: color-mix(in srgb, var(--border) 76%, white 24%);
+    background: color-mix(in srgb, var(--button-secondary-bg) 42%, white 58%);
+  }
+
+  .theme-admin-table-head {
+    background: color-mix(in srgb, var(--button-secondary-bg) 40%, white 60%);
+    color: var(--challenge-primary);
+  }
+
+  .theme-admin-input {
+    border-color: var(--border);
+  }
+
+  .theme-admin-input:focus,
+  .theme-admin-input:focus-visible {
+    border-color: color-mix(in srgb, var(--primary) 45%, white 55%);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent 88%);
+    outline: none;
+  }
+
+  .theme-pill-solid {
+    background: var(--button-gradient);
+    color: var(--primary-foreground);
+    box-shadow: 0 10px 30px var(--button-shadow);
+  }
+
+  .theme-pill-solid:hover {
+    filter: brightness(1.04);
+  }
+
+  .theme-pill-outline {
+    border: 1px solid var(--button-outline-border);
+    background: white;
+    color: var(--button-outline-text);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--button-shadow) 50%, transparent 50%);
+  }
+
+  .theme-pill-outline:hover {
+    background: var(--button-outline-hover);
+  }
+
+  .theme-chip-selected {
+    border-color: color-mix(in srgb, var(--primary) 35%, white 65%);
+    background: color-mix(in srgb, var(--button-secondary-bg) 70%, white 30%);
+    color: var(--button-outline-text);
+  }
+
+  .theme-chip-hover:hover {
+    border-color: color-mix(in srgb, var(--primary) 24%, white 76%);
+    background: color-mix(in srgb, var(--button-secondary-bg) 55%, white 45%);
+  }
+
   .site-header {
-    --site-header-scrolled-accent: #263d75;
+    --site-header-scrolled-accent: var(--header-scrolled-accent);
   }
 
   .site-header {
@@ -173,8 +246,8 @@
 
   .site-header[data-scrolled="true"] {
     color: var(--site-header-scrolled-accent);
-    border-bottom-color: #dce6f8;
-    background: rgba(255, 255, 255, 0.95);
+    border-bottom-color: var(--header-scrolled-border);
+    background: var(--header-scrolled-background);
     box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -207,7 +280,7 @@
 
   .site-header[data-scrolled="true"] .site-header-mobile-button:hover,
   .site-header[data-scrolled="true"] .site-header-inline-icon-button:hover {
-    background: #f4f7ff;
+    background: var(--header-hover-surface);
   }
 
   .site-header-nav-button {
@@ -260,7 +333,7 @@
   }
 
   .site-header[data-scrolled="true"] .site-header-brand:hover {
-    background: #f4f7ff;
+    background: var(--header-hover-surface);
   }
 
   .site-header-brand-logo {

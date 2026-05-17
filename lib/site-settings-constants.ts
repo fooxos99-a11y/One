@@ -20,6 +20,7 @@ export const DEFAULT_EXAM_PORTION_SETTINGS = {
 
 export const RECITATION_DAY_GRADING_SETTINGS_ID = "recitation_day_grading_settings"
 export const GOALS_SECTION_SETTINGS_ID = "goals_section_settings"
+export const SITE_DESIGN_SETTINGS_ID = "site_design_settings"
 
 export const DEFAULT_RECITATION_DAY_GRADING_SETTINGS = {
 	baseScore: 100,
@@ -53,3 +54,20 @@ export const DEFAULT_GOALS_SECTION_SETTINGS = [
 		caption: "مجتاز",
 	},
 ] as const
+
+export const DEFAULT_SITE_DESIGN_SETTINGS = {
+	primary: "#3453a7",
+	primaryDark: "#20335f",
+	border: "#d8e4fb",
+	headerBackground: "#ffffff",
+	headerText: "#20335f",
+	headerBorder: "#dce6f8",
+	heading: "#1a2332",
+	heroStart: "#3553a8",
+	heroMid: "#2f4c9d",
+	heroEnd: "#203772",
+	pageGlow: "#8fb0ff",
+	pageTop: "#eef3fb",
+	pageMiddle: "#e8eef8",
+	pageBottom: "#ffffff",
+} as const

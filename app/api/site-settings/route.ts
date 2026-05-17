@@ -5,6 +5,7 @@ import {
 	EXAM_PORTION_SETTINGS_ID,
 	EXAM_SETTINGS_ID,
 	RECITATION_DAY_GRADING_SETTINGS_ID,
+	SITE_DESIGN_SETTINGS_ID,
 	TEACHER_ATTENDANCE_DELAY_SETTING_ID,
 } from "@/lib/site-settings-constants"
 import { EXAM_WHATSAPP_SETTINGS_ID } from "@/lib/whatsapp-notification-templates"
@@ -23,6 +24,7 @@ const SITE_SETTING_PERMISSIONS: Record<string, string | string[]> = {
 	[RECITATION_DAY_NOTIFICATION_SETTINGS_ID]: "يوم السرد",
 	[RECITATION_DAY_LIFECYCLE_NOTIFICATION_SETTINGS_ID]: "يوم السرد",
 	[RECITATION_DAY_GRADING_SETTINGS_ID]: "يوم السرد",
+	[SITE_DESIGN_SETTINGS_ID]: "تصميم الموقع",
 }
 
 async function requireSiteSettingAccess(request: NextRequest, settingId: string, deniedMessage: string) {

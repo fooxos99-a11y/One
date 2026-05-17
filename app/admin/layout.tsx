@@ -20,6 +20,7 @@ const DASHBOARD_ONLY_ADMIN_PATHS = new Set([
 	"/admin/reports",
 	"/admin/recitation-day",
 	"/admin/semesters",
+	"/admin/site-design",
 	"/admin/statistics",
 	"/admin/store-management",
 	"/admin/store-orders",

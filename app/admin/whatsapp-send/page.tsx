@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
@@ -97,6 +98,15 @@ const TEMPLATE_VARIABLES = [
   { token: "{recipient_type}", label: "نوع المستلم", sample: "المعلمين" },
   { token: "{date}", label: "تاريخ اليوم", sample: "09/04/2026" },
 ] as const
+
+const whatsappOutlinePillClass =
+  "theme-pill-outline inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all"
+
+const whatsappCardClass = "theme-admin-card border-2"
+
+const whatsappSoftPanelClass = "theme-admin-muted-surface rounded-xl p-4"
+
+const whatsappInputAccentClass = "theme-admin-input"
 
 function resolveMessageTemplate(template: string, recipient: Recipient) {
   const replacements: Record<string, string> = {
@@ -845,8 +855,8 @@ export function WhatsAppSendContent({
           <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-[#1a2332] mb-2 flex items-center gap-3">
-                  <MessageCircle className="w-8 h-8 text-[#3453a7]" />
+                <h1 className="mb-2 flex items-center gap-3 text-3xl font-bold text-[var(--challenge-primary)] md:text-4xl">
+                  <MessageCircle className="h-8 w-8 text-[var(--primary)]" />
                   إرسال عبر الواتس
                 </h1>
               </div>
@@ -857,14 +867,14 @@ export function WhatsAppSendContent({
                       <Button
                         type="button"
                         variant="outline"
-                        className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                        className={whatsappOutlinePillClass}
                       >
                         القوالب
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" side="bottom" className="w-[min(92vw,30rem)] space-y-3 rounded-2xl border border-[#3453a7]/15 bg-white p-4 text-right shadow-[0_16px_40px_rgba(19,39,89,0.12)]">
+                    <PopoverContent align="start" side="bottom" className="w-[min(92vw,30rem)] space-y-3 rounded-2xl border border-[var(--border)] bg-white p-4 text-right shadow-[0_16px_40px_rgba(19,39,89,0.12)]">
                       <div className="space-y-1">
-                        <div className="text-sm font-bold text-[#1a2332]">القوالب</div>
+                        <div className="text-sm font-bold text-[var(--challenge-primary)]">القوالب</div>
                         <div className="text-xs text-neutral-500">أضف رسالة جاهزة ثم أدرجها داخل النص الحالي.</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -878,7 +888,7 @@ export function WhatsAppSendContent({
                         <Button
                           type="button"
                           variant="outline"
-                          className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600"
+                          className="theme-admin-input text-sm h-9 rounded-lg text-neutral-600"
                           onClick={handleAddReadyMessage}
                         >
                           إضافة
@@ -894,7 +904,7 @@ export function WhatsAppSendContent({
                             <div key={msg.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                               <div className="mb-2 text-xs leading-6 text-gray-700">{msg.text}</div>
                               <div className="flex items-center gap-2">
-                                <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
+                                <Button type="button" size="sm" variant="outline" className="theme-admin-input text-sm h-8 rounded-lg text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
                                   إدراج
                                 </Button>
                                 <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteReadyMessage(msg.id)}>
@@ -913,7 +923,7 @@ export function WhatsAppSendContent({
                     type="button"
                     variant="outline"
                     onClick={toggleRepliesView}
-                    className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                    className={whatsappOutlinePillClass}
                   >
                     {isRepliesView ? "عرض الإرسال" : "عرض الردود"}
                   </Button>
@@ -923,7 +933,7 @@ export function WhatsAppSendContent({
 
             {isRepliesView ? (
               <div className="space-y-6">
-                <Card className="border-2 border-[#3453a7]/20">
+                <Card className={whatsappCardClass}>
                   <CardContent className="pt-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center">
                       <div className="flex flex-1 items-center gap-2">
@@ -940,7 +950,7 @@ export function WhatsAppSendContent({
                         type="button"
                         variant={showUnreadOnly ? "default" : "outline"}
                         onClick={() => setShowUnreadOnly((prev) => !prev)}
-                        className={showUnreadOnly ? "bg-[#3453a7] hover:bg-[#274187]" : "border-[#3453a7]/30 text-[#3453a7]"}
+                        className={showUnreadOnly ? "theme-pill-solid" : "theme-pill-outline"}
                       >
                         غير المقروء فقط
                       </Button>
@@ -948,9 +958,9 @@ export function WhatsAppSendContent({
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-[#3453a7]/20">
+                <Card className={whatsappCardClass}>
                   <CardHeader>
-                    <CardTitle className="text-[#1a2332]">الردود المستلمة ({filteredReplies.length})</CardTitle>
+                    <CardTitle className="text-[var(--challenge-primary)]">الردود المستلمة ({filteredReplies.length})</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {isRepliesLoading ? (
@@ -968,18 +978,18 @@ export function WhatsAppSendContent({
                         const sentImageSrc = buildMediaSrc(reply.sent_media_base64, reply.sent_media_mime_type)
 
                         return (
-                          <div key={reply.id} className={`rounded-2xl border p-4 md:p-5 ${reply.is_read ? "border-slate-200 bg-white" : "border-[#cddcf6] bg-[#f7fbff]"}`}>
+                          <div key={reply.id} className={`rounded-2xl border p-4 md:p-5 ${reply.is_read ? "border-slate-200 bg-white" : "theme-admin-muted-surface"}`}>
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                               <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-[#1a2332]">
-                                  {reply.is_read ? <CheckCheck className="h-5 w-5 text-green-600" /> : <MessageCircle className="h-5 w-5 text-[#3453a7]" />}
+                                <div className="flex items-center gap-2 text-[var(--challenge-primary)]">
+                                  {reply.is_read ? <CheckCheck className="h-5 w-5 text-green-600" /> : <MessageCircle className="h-5 w-5 text-[var(--primary)]" />}
                                   <h3 className="text-lg font-bold">{reply.student_name}</h3>
                                 </div>
                               </div>
 
                               <div className="flex flex-wrap items-center gap-2">
                                 {!reply.is_read ? (
-                                  <Button type="button" onClick={() => void markReplyAsRead(reply.id)} size="sm" className="bg-[#3453a7] hover:bg-[#274187]">
+                                  <Button type="button" onClick={() => void markReplyAsRead(reply.id)} size="sm" className="theme-pill-solid">
                                     تحديد كمقروء
                                   </Button>
                                 ) : null}
@@ -998,23 +1008,23 @@ export function WhatsAppSendContent({
                             </div>
 
                             <div className="mt-4 grid gap-3 md:grid-cols-2">
-                              <div className="rounded-xl border border-[#3453a7]/20 bg-[#3453a7]/5 p-4">
-                                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#3453a7]">
+                              <div className={whatsappSoftPanelClass}>
+                                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--primary)]">
                                   <Send className="h-4 w-4" />
                                   الرسالة المرسلة
                                 </div>
                                 {sentImageSrc ? (
                                   <div className="space-y-3">
-                                    <img src={sentImageSrc} alt="الصورة المرسلة" className="h-48 w-full rounded-xl border border-[#3453a7]/15 object-cover" />
-                                    {reply.sent_message_text ? <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.sent_message_text}</p> : <p className="text-sm leading-7 text-[#1a2332]">تم إرسال صورة بدون نص مرفق.</p>}
+                                    <img src={sentImageSrc} alt="الصورة المرسلة" className="h-48 w-full rounded-xl border border-[var(--border)] object-cover" />
+                                    {reply.sent_message_text ? <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--challenge-primary)]">{reply.sent_message_text}</p> : <p className="text-sm leading-7 text-[var(--challenge-primary)]">تم إرسال صورة بدون نص مرفق.</p>}
                                   </div>
                                 ) : (
-                                  <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.sent_message_text}</p>
+                                  <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--challenge-primary)]">{reply.sent_message_text}</p>
                                 )}
                               </div>
 
-                              <div className="rounded-xl border border-[#3453a7]/20 bg-[#3453a7]/5 p-4">
-                                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#3453a7]">
+                              <div className={whatsappSoftPanelClass}>
+                                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--primary)]">
                                   {reply.reply_type === "audio" || reply.reply_type === "ptt" ? <Mic className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
                                   أول رد من ولي الأمر
                                 </div>
@@ -1024,10 +1034,10 @@ export function WhatsAppSendContent({
                                       <source src={replyAudioSrc} type={reply.media_mime_type || "audio/ogg"} />
                                       المتصفح الحالي لا يدعم تشغيل الصوت.
                                     </audio>
-                                    <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.reply_message_text}</p>
+                                    <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--challenge-primary)]">{reply.reply_message_text}</p>
                                   </div>
                                 ) : (
-                                  <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.reply_message_text}</p>
+                                  <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--challenge-primary)]">{reply.reply_message_text}</p>
                                 )}
                               </div>
                             </div>
@@ -1041,9 +1051,9 @@ export function WhatsAppSendContent({
             ) : (
             <div className="flex flex-col gap-6">
               <div className="order-1">
-                <Card className="border-2 border-[#3453a7]/20">
+                <Card className={whatsappCardClass}>
                   <CardHeader>
-                    <CardTitle className="text-[#1a2332]">اختيار المستلمين</CardTitle>
+                    <CardTitle className="text-[var(--challenge-primary)]">اختيار المستلمين</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <input
@@ -1055,13 +1065,14 @@ export function WhatsAppSendContent({
                       className="hidden"
                     />
 
-                    <div className="flex items-center gap-3 rounded-2xl border border-[#3453a7]/15 bg-[#f8fbff] px-3 py-3">
-                      <Input
+                    <div className="theme-admin-muted-surface flex items-end gap-3 rounded-2xl px-3 py-3">
+                      <Textarea
                         id="message"
                         placeholder="اكتب رسالتك هنا..."
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
-                        className="h-11 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                        rows={3}
+                        className="min-h-[72px] resize-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                       />
                       <Button
                         type="button"
@@ -1069,7 +1080,7 @@ export function WhatsAppSendContent({
                         size="icon"
                         onClick={() => fileInputRef.current?.click()}
                         title={imagePayload?.fileName || "رفع ملف"}
-                        className={`h-11 w-11 rounded-2xl border-[#3453a7]/40 bg-white text-[#3453a7] ${imagePayload ? "border-[#3453a7] bg-[#edf3ff]" : ""}`}
+                        className={`theme-admin-input h-11 w-11 rounded-2xl bg-white text-[var(--primary)] ${imagePayload ? "border-[var(--primary)] bg-[var(--button-outline-hover)]" : ""}`}
                       >
                         <Paperclip className="h-4 w-4" />
                       </Button>
@@ -1092,7 +1103,7 @@ export function WhatsAppSendContent({
 
                     <div className="grid grid-cols-1 md:grid-cols-[220px_220px_minmax(0,1fr)_auto] gap-3">
                       <Select value={selectedRecipientGroup} onValueChange={handleChangeRecipientGroup}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${whatsappInputAccentClass}`}>
                           <SelectValue placeholder="اختر الفئة" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1103,7 +1114,7 @@ export function WhatsAppSendContent({
                       </Select>
 
                       <Select value={selectedFilter} onValueChange={setSelectedFilter}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${whatsappInputAccentClass}`}>
                           <SelectValue placeholder={getRecipientFilterLabel(selectedRecipientGroup)} />
                         </SelectTrigger>
                         <SelectContent>
@@ -1119,12 +1130,13 @@ export function WhatsAppSendContent({
                         placeholder="بحث بالاسم أو رقم الهاتف أو رقم الحساب..."
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
+                        className={whatsappInputAccentClass}
                       />
 
                       <Button
                         onClick={handleSelectAll}
                         variant="outline"
-                        className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600 whitespace-nowrap"
+                        className="theme-admin-input text-sm h-9 rounded-lg whitespace-nowrap text-neutral-600"
                       >
                         {allFilteredSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
                       </Button>
@@ -1140,21 +1152,21 @@ export function WhatsAppSendContent({
                         filteredRecipients.map((recipient) => (
                           <label
                             key={recipient.id}
-                            className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:border-[#3453a7] ${selectedRecipients.includes(recipient.id) ? "border-[#3453a7] bg-[#3453a7]/5" : "border-gray-200"}`}
+                            className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-4 transition-all ${selectedRecipients.includes(recipient.id) ? "theme-chip-selected border-[var(--primary)]" : "border-gray-200 hover:border-[var(--primary)]"}`}
                           >
                             <input
                               type="checkbox"
                               checked={selectedRecipients.includes(recipient.id)}
                               onChange={() => handleSelectRecipient(recipient.id)}
-                              className="w-5 h-5 text-[#3453a7] rounded"
+                              className="h-5 w-5 rounded text-[var(--primary)]"
                             />
                             <div className="flex-1">
-                              <p className="font-semibold text-[#1a2332]">{recipient.name}</p>
+                              <p className="font-semibold text-[var(--challenge-primary)]">{recipient.name}</p>
                               <p className="text-sm text-gray-600 flex items-center gap-1">
                                 <Phone className="w-3 h-3" />
                                 {formatGuardianPhoneForDisplay(recipient.phoneNumber)}
                               </p>
-                              <p className="mt-1 text-xs font-semibold text-[#3453a7]">{getRecipientSecondaryLabel(recipient)}</p>
+                              <p className="mt-1 text-xs font-semibold text-[var(--primary)]">{getRecipientSecondaryLabel(recipient)}</p>
                             </div>
                             <div className="text-sm text-gray-500">#{recipient.accountNumber || "-"}</div>
                           </label>
@@ -1166,7 +1178,7 @@ export function WhatsAppSendContent({
                       onClick={handleSendMessages}
                       disabled={isSending || isWhatsAppStatusLoading || selectedRecipients.length === 0 || (!message.trim() && !imagePayload)}
                       variant="outline"
-                      className="w-full text-sm h-9 rounded-lg border-[#3453a7]/50 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] !text-white hover:brightness-105 hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60"
+                      className="w-full text-sm h-9 rounded-lg border-[var(--button-outline-border)] bg-[var(--button-gradient)] !text-white hover:brightness-105 hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60"
                     >
                       {isSending ? "جاري الإرسال" : <><Send className="w-4 h-4 ml-2" />إرسال</>}
                     </Button>

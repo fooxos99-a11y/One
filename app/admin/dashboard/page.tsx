@@ -21,6 +21,7 @@ import {
   Plus,
   Loader2,
   Lock,
+  Palette,
   Trash2,
   LayoutPanelTop,
   MessageSquare,
@@ -56,6 +57,7 @@ import { QuestionsDatabaseContent } from "@/app/admin/questions/page"
 import { ReportsPageContent } from "@/app/admin/reports/page"
 import { RecitationDayContent } from "@/app/admin/recitation-day/page"
 import { SemestersContent } from "@/app/admin/semesters/page"
+import { SiteDesignContent } from "@/app/admin/site-design/page"
 import { StoreManagementContent } from "@/app/admin/store-management/page"
 import { StoreOrdersContent } from "@/app/admin/store-orders/page"
 import { StudentRecordsContent } from "@/app/admin/student-records/page"
@@ -107,6 +109,25 @@ type WhatsAppStatusSummary = {
 
 function isConnectedWhatsAppStatus(status: WhatsAppStatusSummary | null) {
   return Boolean(status?.workerOnline && status?.ready && status?.authenticated && status?.status === "connected")
+}
+
+const dashboardOutlineButtonClass =
+  "theme-pill-outline inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all"
+
+const dashboardSolidButtonClass =
+  "theme-pill-solid inline-flex h-12 items-center gap-2 rounded-full px-5 text-sm font-bold transition-all"
+
+const dashboardSquareOutlineButtonClass =
+  "theme-pill-outline relative flex h-12 w-12 items-center justify-center rounded-full transition-all"
+
+const dashboardDropdownContentClass =
+  "min-w-[220px] rounded-[1.25rem] border border-[var(--border)] bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.12)]"
+
+const dashboardDropdownItemClass =
+  "cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[var(--button-outline-hover)] focus:text-[var(--challenge-primary)]"
+
+function getDashboardFilterButtonClass(isActive: boolean) {
+  return `${isActive ? "theme-pill-solid" : "theme-pill-outline"} inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all`
 }
 
 const adminSections: DashboardSection[] = [
@@ -244,7 +265,7 @@ const adminSections: DashboardSection[] = [
   {
     key: "general",
     title: "الإدارة العامة",
-    description: "الاختبارات، المسار، المتجر، الإشعارات، المالية، والفصول.",
+    description: "الاختبارات، المسار، المتجر، الإشعارات، التصميم، المالية، والفصول.",
     icon: LayoutPanelTop,
     accentClassName: "from-[#20335f] to-[#3453a7]",
     items: [
@@ -327,6 +348,14 @@ const adminSections: DashboardSection[] = [
         icon: Calendar,
         permissionKey: "إنهاء الفصل",
         getPath: () => "/admin/semesters",
+      },
+      {
+        key: "general-site-design",
+        label: "تصميم الموقع",
+        description: "تعديل اللون الأساسي والتدرجات العامة للموقع من شاشة واحدة.",
+        icon: Palette,
+        permissionKey: "تصميم الموقع",
+        getPath: () => "/admin/site-design",
       },
     ],
   },
@@ -756,6 +785,10 @@ export default function AdminDashboardPage() {
       return "permissions" as const
     }
 
+    if (activeAction.resolvedPath.startsWith("/admin/site-design")) {
+      return "site-design" as const
+    }
+
     if (activeAction.resolvedPath.startsWith("/admin/finance")) {
       return "finance" as const
     }
@@ -1026,22 +1059,22 @@ export default function AdminDashboardPage() {
                   const isExpanded = expandedSectionKeys.includes(section.key)
 
                   return (
-                    <div key={section.key} className={index >= 4 ? "border-t border-[#e7eef2] pt-3" : undefined}>
+                    <div key={section.key} className={index >= 4 ? "border-t border-[var(--border)] pt-3" : undefined}>
                       <button
                         type="button"
                         onClick={() => toggleSection(section.key)}
-                        className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[15px] font-medium text-[#1f2a3d] transition-all duration-200 hover:text-[#3453a7]"
+                        className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[15px] font-medium text-[var(--challenge-primary)] transition-all duration-200 hover:text-[var(--primary)]"
                       >
                         <div className="flex items-center gap-2.5">
                           <span>{section.title}</span>
-                          <SectionIcon className="size-4 text-[#3453a7]/70" />
+                          <SectionIcon className="size-4 text-[var(--button-outline-text)]" />
                         </div>
-                        <ChevronDown className={`size-4 transition-transform duration-300 ease-out ${isExpanded ? "rotate-180 text-[#3453a7]" : "rotate-0 text-[#3453a7]/70"}`} />
+                        <ChevronDown className={`size-4 transition-transform duration-300 ease-out ${isExpanded ? "rotate-180 text-[var(--primary)]" : "rotate-0 text-[var(--button-outline-text)]"}`} />
                       </button>
 
                       <div className={`grid transition-all duration-300 ease-out ${isExpanded ? "mt-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
                         <div className="overflow-hidden">
-                          <div className="space-y-1.5 rounded-2xl bg-[#f8fbff] p-2">
+                          <div className="theme-admin-muted-surface space-y-1.5 rounded-2xl p-2">
                           {section.items.map((item) => {
                             const ItemIcon = item.icon
                             const isSelected = activeAction?.key === item.key
@@ -1056,13 +1089,13 @@ export default function AdminDashboardPage() {
                                 }}
                                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                                   isSelected
-                                    ? "bg-[#3453a7]/8 text-[#36506f] ring-1 ring-[#3453a7]/10"
-                                    : "text-[#36506f] hover:bg-[#3453a7]/6 hover:text-[#36506f]"
+                                    ? "theme-chip-selected ring-1 ring-[color:color-mix(in_srgb,var(--primary)_14%,transparent_86%)]"
+                                    : "theme-chip-hover text-[#36506f]"
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5">
                                   <span>{item.resolvedLabel}</span>
-                                  <ItemIcon className="size-4 text-[#3453a7]/70" />
+                                  <ItemIcon className="size-4 text-[var(--button-outline-text)]" />
                                 </div>
                               </button>
                             )
@@ -1103,28 +1136,28 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showAll()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "all" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "all")}
                       >
                         الكل
                       </button>
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showUnread()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "unread" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "unread")}
                       >
                         غير مقروءة
                       </button>
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showRead()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "read" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "read")}
                       >
                         مقروءة
                       </button>
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showArchived()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "archived" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "archived")}
                       >
                         مؤرشفة
                       </button>
@@ -1138,17 +1171,17 @@ export default function AdminDashboardPage() {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="inline-flex h-12 items-center gap-2 rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                          className={dashboardOutlineButtonClass}
                         >
                           <Plus className="h-4 w-4" />
                           إضافة
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-[220px] rounded-[1.25rem] border border-[#dfe7f5] bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.12)]">
-                        <DropdownMenuItem onClick={() => teacherInlineActions.openSingleForm()} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                      <DropdownMenuContent align="end" className={dashboardDropdownContentClass}>
+                        <DropdownMenuItem onClick={() => teacherInlineActions.openSingleForm()} className={dashboardDropdownItemClass}>
                           إضافة معلم
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => teacherInlineActions.openBulkForm()} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                        <DropdownMenuItem onClick={() => teacherInlineActions.openBulkForm()} className={dashboardDropdownItemClass}>
                           إضافة جماعية
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -1159,17 +1192,17 @@ export default function AdminDashboardPage() {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="inline-flex h-12 items-center gap-2 rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                          className={dashboardOutlineButtonClass}
                         >
                           <Plus className="h-4 w-4" />
                           إضافة
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-[220px] rounded-[1.25rem] border border-[#dfe7f5] bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.12)]">
-                        <DropdownMenuItem onClick={() => adminInlineActions.openRoleForm()} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                      <DropdownMenuContent align="end" className={dashboardDropdownContentClass}>
+                        <DropdownMenuItem onClick={() => adminInlineActions.openRoleForm()} className={dashboardDropdownItemClass}>
                           إضافة مسمى
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => adminInlineActions.openAdminForm()} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                        <DropdownMenuItem onClick={() => adminInlineActions.openAdminForm()} className={dashboardDropdownItemClass}>
                           إضافة إداري
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -1179,7 +1212,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => circleInlineActions.openAddDialog()}
-                      className="inline-flex h-12 items-center gap-2 rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      className={dashboardOutlineButtonClass}
                     >
                       <Plus className="h-4 w-4" />
                       إضافة
@@ -1203,7 +1236,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => enrollmentInlineActions.copyEnrollmentLink()}
-                        className="inline-flex h-12 min-w-[148px] items-center justify-center gap-2 rounded-full bg-[#3453a7] px-4 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={`${dashboardSolidButtonClass} min-w-[148px] justify-center px-4`}
                       >
                         {enrollmentInlineActions.copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         نسخ الرابط
@@ -1211,7 +1244,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => enrollmentInlineActions.openTemplates()}
-                        className="inline-flex h-12 min-w-[148px] items-center justify-center rounded-full border border-[#d8e5fb] bg-white px-4 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                        className={`${dashboardOutlineButtonClass} min-w-[148px] justify-center px-4`}
                       >
                         القوالب
                       </button>
@@ -1221,7 +1254,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => teacherAttendanceInlineActions.openDelayDialog()}
-                      className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      className={dashboardOutlineButtonClass}
                     >
                       مدة التأخير
                     </button>
@@ -1231,28 +1264,28 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showAll()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "all" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "all")}
                       >
                         الكل
                       </button>
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showUnread()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "unread" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "unread")}
                       >
                         غير مقروءة
                       </button>
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showRead()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "read" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "read")}
                       >
                         مقروءة
                       </button>
                       <button
                         type="button"
                         onClick={() => reportsInlineActions.showArchived()}
-                        className={`inline-flex h-12 items-center rounded-full px-5 text-sm font-bold transition-all ${reportsInlineActions.filter === "archived" ? "bg-[#3453a7] text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] hover:bg-[#24428f]" : "border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"}`}
+                        className={getDashboardFilterButtonClass(reportsInlineActions.filter === "archived")}
                       >
                         مؤرشفة
                       </button>
@@ -1262,7 +1295,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => studentDailyInlineActions.openTemplates()}
-                      className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      className={dashboardOutlineButtonClass}
                     >
                       القوالب
                     </button>
@@ -1272,7 +1305,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => examInlineActions.openSchedulesOverview()}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <CalendarDays className="h-4 w-4" />
                         المواعيد
@@ -1280,7 +1313,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => examInlineActions.openExamResults()}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <Bell className="h-4 w-4" />
                         نتائج الاختبارات
@@ -1288,7 +1321,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => examInlineActions.openSettings()}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <Settings className="h-4 w-4" />
                         إعدادات الاختبارات
@@ -1300,7 +1333,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => pathwaysInlineActions.openAddLevel()}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <Plus className="h-4 w-4" />
                         إضافة
@@ -1308,14 +1341,14 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => pathwaysInlineActions.openTemplates()}
-                        className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                        className={dashboardOutlineButtonClass}
                       >
                         القالب
                       </button>
                       <button
                         type="button"
                         onClick={() => pathwaysInlineActions.openResults()}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <FileText className="h-4 w-4" />
                         نتائج المسار
@@ -1327,14 +1360,14 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => recitationDayInlineActions.openTemplates()}
-                        className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                        className={dashboardOutlineButtonClass}
                       >
                         القوالب
                       </button>
                       <button
                         type="button"
                         onClick={() => recitationDayInlineActions.openArchive()}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <Archive className="h-4 w-4" />
                         الأرشيف
@@ -1346,7 +1379,7 @@ export default function AdminDashboardPage() {
                       <button
                         type="button"
                         onClick={() => setStoreDashboardView((current) => (current === "orders" ? "catalog" : "orders"))}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                        className={dashboardSolidButtonClass}
                       >
                         <ShoppingBag className="h-4 w-4" />
                         {storeDashboardView === "orders" ? "العودة للمتجر" : "طلبات الطلاب"}
@@ -1355,17 +1388,17 @@ export default function AdminDashboardPage() {
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex h-12 items-center gap-2 rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                            className={dashboardOutlineButtonClass}
                           >
                             <Plus className="h-4 w-4" />
                             إضافة
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-[220px] rounded-[1.25rem] border border-[#dfe7f5] bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.12)]">
-                          <DropdownMenuItem onClick={() => storeInlineActions.openAddProduct()} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                        <DropdownMenuContent align="end" className={dashboardDropdownContentClass}>
+                          <DropdownMenuItem onClick={() => storeInlineActions.openAddProduct()} className={dashboardDropdownItemClass}>
                             إضافة منتج
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => storeInlineActions.openAddCategory()} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                          <DropdownMenuItem onClick={() => storeInlineActions.openAddCategory()} className={dashboardDropdownItemClass}>
                             إضافة فئة
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1376,7 +1409,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => setInlineDialogAction(inlineDialogAction === "add-student" ? "bulk-add" : "add-student")}
-                      className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      className={dashboardOutlineButtonClass}
                     >
                       {inlineDialogAction === "add-student" ? "إضافة جماعية" : "إضافة طالب"}
                     </button>
@@ -1386,7 +1419,7 @@ export default function AdminDashboardPage() {
                       type="button"
                       onClick={() => editStudentInlineActions.openMoveDialog()}
                       disabled={!editStudentInlineActions.hasSelectedStudent || editStudentInlineActions.isSubmitting}
-                      className="inline-flex h-12 items-center gap-2 rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff] disabled:cursor-not-allowed disabled:opacity-50"
+                      className={`${dashboardOutlineButtonClass} gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                     >
                       <ArrowRightLeft className="h-4 w-4" />
                       نقل الطالب
@@ -1417,7 +1450,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => whatsAppSendInlineActions.toggleRepliesView()}
-                      className="inline-flex h-12 items-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      className={dashboardOutlineButtonClass}
                     >
                       {whatsAppSendInlineActions.isRepliesView ? "عرض الإرسال" : "عرض الردود"}
                     </button>
@@ -1426,7 +1459,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => semestersInlineActions.openEndSemesterDialog()}
-                      className="inline-flex h-12 items-center gap-2 rounded-full bg-[#3453a7] px-5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(52,83,167,0.16)] transition-all hover:bg-[#24428f]"
+                      className={dashboardSolidButtonClass}
                     >
                       إنهاء الفصل
                     </button>
@@ -1434,15 +1467,15 @@ export default function AdminDashboardPage() {
                   {canViewWhatsAppQueue ? (
                     <WhatsAppQueueIndicator
                       enabled={canViewWhatsAppQueue}
-                      buttonClassName="h-12 w-12 border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] hover:bg-[#f6f9ff]"
-                      iconClassName="text-[#3453a7]"
+                      buttonClassName={dashboardSquareOutlineButtonClass}
+                      iconClassName="text-[var(--button-outline-text)]"
                     />
                   ) : null}
                   {canOpenWhatsAppQr ? (
                     <button
                       type="button"
                       onClick={() => void openWhatsAppEntryPoint()}
-                      className="relative flex h-12 w-12 items-center justify-center rounded-full border border-[#d8e5fb] bg-white text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff]"
+                      className={dashboardSquareOutlineButtonClass}
                       aria-label="باركود الواتساب"
                     >
                       <QrCode className="h-5 w-5" />
@@ -1496,6 +1529,8 @@ export default function AdminDashboardPage() {
                       <AdminNotificationsContent displayMode="inline" />
                     ) : activeInlinePage === "permissions" ? (
                       <PermissionsContent displayMode="inline" />
+                    ) : activeInlinePage === "site-design" ? (
+                      <SiteDesignContent displayMode="inline" />
                     ) : activeInlinePage === "finance" ? (
                       <FinanceContent displayMode="inline" />
                     ) : activeInlinePage === "store-management" ? (
