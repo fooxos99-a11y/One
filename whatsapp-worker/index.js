@@ -1270,18 +1270,12 @@ async function updateQueueStatus(id, status, errorMessage = null) {
 }
 
 async function claimPendingMessage(id) {
-  const processingPayload = {
-    status: "processing",
-    sent_at: null,
-    error_message: null,
-  }
-
   const { data, error } = await supabase
     .from(QUEUE_TABLE)
-    .update(processingPayload)
+    .select("id")
     .eq("id", id)
     .eq("status", "pending")
-    .select("id")
+    .limit(1)
 
   if (error) {
     log(`Failed to claim pending message ${id}.`, error)
@@ -1292,15 +1286,6 @@ async function claimPendingMessage(id) {
 
   if (!claimed) {
     return false
-  }
-
-  const { error: historyError } = await supabase
-    .from(HISTORY_TABLE)
-    .update(processingPayload)
-    .eq("id", id)
-
-  if (historyError && historyError.code !== "42P01") {
-    log(`Failed to mirror processing status to whatsapp_messages for ${id}.`, historyError)
   }
 
   return true
@@ -1420,7 +1405,7 @@ async function skipPendingMessagesAfterReconnect() {
   const { data, error } = await supabase
     .from(QUEUE_TABLE)
     .select("id")
-    .in("status", ["pending", "processing"])
+    .eq("status", "processing")
 
   if (error) {
     throw error
@@ -1439,7 +1424,7 @@ async function skipPendingMessagesAfterReconnect() {
   }
 
   const skippedAt = new Date().toISOString()
-  const skipReason = "Skipped after WhatsApp reconnect; resend manually."
+  const skipReason = "Skipped stale processing message after WhatsApp reconnect; resend manually."
 
   const { error: queueError } = await supabase
     .from(QUEUE_TABLE)

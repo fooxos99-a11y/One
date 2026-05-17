@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const { count, error } = await supabase
     .from(WHATSAPP_QUEUE_TABLE)
     .select("id", { count: "exact", head: true })
-    .in("status", ["pending", "processing"])
+    .eq("status", "pending")
 
   if (error && error.code !== "42P01") {
     return NextResponse.json({ error: "تعذر قراءة حالة طابور الرسائل" }, { status: 500 })

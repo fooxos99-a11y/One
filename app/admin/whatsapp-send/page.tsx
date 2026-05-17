@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
@@ -43,13 +44,6 @@ type SendResults = {
   sent: number
   pending: number
   failed: number
-}
-
-type LocalDeviceLink = {
-  id: string
-  name: string
-  phoneNumber: string
-  url: string
 }
 
 type QueuedMessageStatus = {
@@ -180,25 +174,6 @@ function getRecipientSecondaryLabel(recipient: Recipient) {
   return details.filter(Boolean).join(" • ") || "بدون حلقة"
 }
 
-function normalizePhoneForWhatsAppLink(phoneNumber: string) {
-  let normalized = String(phoneNumber || "").trim().replace(/[^\d+]/g, "")
-
-  if (normalized.startsWith("+")) {
-    normalized = normalized.slice(1)
-  }
-
-  if (normalized.startsWith("00")) {
-    normalized = normalized.slice(2)
-  }
-
-  return normalized.replace(/\D/g, "")
-}
-
-function buildWhatsAppLink(phoneNumber: string, message: string) {
-  const normalizedPhone = normalizePhoneForWhatsAppLink(phoneNumber)
-  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`
-}
-
 export function WhatsAppSendContent({
   displayMode = "page",
   onInlineActionsChange,
@@ -236,7 +211,6 @@ export function WhatsAppSendContent({
   const [localFailedCount, setLocalFailedCount] = useState(0)
   const [trackedQueuedIds, setTrackedQueuedIds] = useState<string[]>([])
   const [imagePayload, setImagePayload] = useState<OutgoingImagePayload | null>(null)
-  const [localDeviceLinks, setLocalDeviceLinks] = useState<LocalDeviceLink[]>([])
   const [activeView, setActiveView] = useState<"send" | "replies">("send")
   const [replies, setReplies] = useState<Reply[]>([])
   const [filteredReplies, setFilteredReplies] = useState<Reply[]>([])
@@ -366,38 +340,6 @@ export function WhatsAppSendContent({
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
-  }
-
-  const prepareLocalDeviceLinks = (recipients: Recipient[]) => {
-    return recipients
-      .map((recipient) => {
-        const resolvedMessage = resolveMessageTemplate(message, recipient).trim()
-        const normalizedPhone = normalizePhoneForWhatsAppLink(recipient.phoneNumber)
-        if (!normalizedPhone || !resolvedMessage) {
-          return null
-        }
-
-        return {
-          id: recipient.id,
-          name: recipient.name,
-          phoneNumber: recipient.phoneNumber,
-          url: buildWhatsAppLink(normalizedPhone, resolvedMessage),
-        } satisfies LocalDeviceLink
-      })
-      .filter((recipient): recipient is LocalDeviceLink => Boolean(recipient))
-  }
-
-  const activateLocalDeviceFallback = (recipients: Recipient[]) => {
-    const nextLinks = prepareLocalDeviceLinks(recipients)
-    setLocalDeviceLinks(nextLinks)
-    setSendResults(null)
-
-    toast({
-      title: "تم تجهيز روابط واتساب على هذا الجهاز",
-      description: imagePayload
-        ? "الـ VPS غير متاح حاليًا. جهزت روابط واتساب أدناه. المرفقات لا تُرفق تلقائيًا في هذا الوضع."
-        : "الـ VPS غير متاح حاليًا. جهزت روابط واتساب أدناه لتفتح من هذا الجهاز.",
-    })
   }
 
   const handleImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -737,12 +679,14 @@ export function WhatsAppSendContent({
     const selectedRecipientsData = currentRecipients.filter((recipient) => selectedRecipients.includes(recipient.id))
 
     if (!isWhatsAppReady) {
-      activateLocalDeviceFallback(selectedRecipientsData)
+      toast({
+        title: "عامل واتساب غير جاهز",
+        description: "شغّل عامل واتساب المحلي أو اربط الخادم ثم أعد المحاولة.",
+        variant: "destructive",
+      })
       setIsSending(false)
       return
     }
-
-    setLocalDeviceLinks([])
 
     try {
       const response = await fetch("/api/whatsapp/send", {
@@ -768,7 +712,11 @@ export function WhatsAppSendContent({
       const data = await response.json().catch(() => ({}))
       if (!response.ok || !data.success) {
         if (response.status === 409) {
-          activateLocalDeviceFallback(selectedRecipientsData)
+          toast({
+            title: "عامل واتساب غير جاهز",
+            description: data.error || "شغّل عامل واتساب المحلي أو اربط الخادم ثم أعد المحاولة.",
+            variant: "destructive",
+          })
           return
         }
         throw new Error(data.error || "فشل في تجهيز رسائل واتساب")
@@ -804,7 +752,6 @@ export function WhatsAppSendContent({
         setMessage("")
         clearImageSelection()
         setSelectedRecipients([])
-        setLocalDeviceLinks([])
       } else {
         toast({
           title: "فشل",
@@ -1043,7 +990,7 @@ export function WhatsAppSendContent({
               </div>
             ) : (
             <div className="flex flex-col gap-6">
-              <div>
+              <div className="order-2">
                 <Card className="border-2 border-[#3453a7]/20">
                   <CardHeader>
                     <div className="flex items-center justify-between gap-3">
@@ -1083,44 +1030,6 @@ export function WhatsAppSendContent({
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="message">نص الرسالة</Label>
-                      <div className="flex gap-2 mb-2 items-center">
-                        <Input
-                          type="text"
-                          placeholder="اكتب نص لإضافته كرسالة جاهزة"
-                          value={quickText}
-                          onChange={(event) => setQuickText(event.target.value)}
-                          className="text-xs w-2/3"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600"
-                          onClick={handleAddReadyMessage}
-                        >
-                          إضافة
-                        </Button>
-                      </div>
-                      <div className="space-y-1 mb-2">
-                        {isLoadingReady ? (
-                          <div className="py-1"><SiteLoader /></div>
-                        ) : readyMessages.length === 0 ? (
-                          <div className="text-xs text-gray-400">لا توجد رسائل جاهزة</div>
-                        ) : (
-                          readyMessages.map((msg) => (
-                            <div key={msg.id} className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1">
-                              <span className="flex-1 text-xs text-gray-700">{msg.text}</span>
-                              <div className="flex gap-2">
-                                <Button type="button" size="sm" variant="outline" className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
-                                  إدراج
-                                </Button>
-                                <Button type="button" size="sm" variant="outline" className="text-sm h-9 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteReadyMessage(msg.id)}>
-                                  حذف
-                                </Button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
                       <Textarea
                         id="message"
                         placeholder="اكتب رسالتك هنا...."
@@ -1182,57 +1091,77 @@ export function WhatsAppSendContent({
                       ) : null}
                     </div>
 
-                    {sendResults ? (
-                      <div className="space-y-2 rounded-lg bg-white p-4">
-                        <h4 className="font-semibold text-[#1a2332]">نتائج الإرسال الفعلية:</h4>
-                        <div className="flex items-center gap-2 text-green-600">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>تم الإرسال: {sendResults.sent}</span>
-                        </div>
-                        {sendResults.pending > 0 ? (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-[#3453a7]/15 bg-[#f8fbff] p-4 sm:flex-row sm:items-start sm:justify-between">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="text-sm h-10 rounded-lg border-[#3453a7]/50 bg-white px-4 text-[#3453a7]"
+                          >
+                            القوالب
+                            {readyMessages.length > 0 ? <span className="ms-2 text-xs text-[#6b7fc0]">{readyMessages.length}</span> : null}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" side="top" className="w-[min(92vw,30rem)] space-y-3 rounded-2xl border border-[#3453a7]/15 bg-white p-4 text-right shadow-[0_16px_40px_rgba(19,39,89,0.12)]">
+                          <div className="space-y-1">
+                            <div className="text-sm font-bold text-[#1a2332]">القوالب</div>
+                            <div className="text-xs text-neutral-500">أضف رسالة جاهزة ثم أدرجها داخل النص الحالي.</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="text"
+                              placeholder="اكتب نص لإضافته كرسالة جاهزة"
+                              value={quickText}
+                              onChange={(event) => setQuickText(event.target.value)}
+                              className="text-xs"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-600"
+                              onClick={handleAddReadyMessage}
+                            >
+                              إضافة
+                            </Button>
+                          </div>
+                          <div className="max-h-72 space-y-2 overflow-y-auto">
+                            {isLoadingReady ? (
+                              <div className="py-3"><SiteLoader /></div>
+                            ) : readyMessages.length === 0 ? (
+                              <div className="text-xs text-gray-400">لا توجد قوالب جاهزة</div>
+                            ) : (
+                              readyMessages.map((msg) => (
+                                <div key={msg.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                  <div className="mb-2 text-xs leading-6 text-gray-700">{msg.text}</div>
+                                  <div className="flex items-center gap-2">
+                                    <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-[#3453a7]/50 text-neutral-600" onClick={() => setMessage((prev) => prev ? `${prev}\n${msg.text}` : msg.text)}>
+                                      إدراج
+                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" className="text-sm h-8 rounded-lg border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteReadyMessage(msg.id)}>
+                                      حذف
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      {sendResults ? (
+                        <div className="flex flex-wrap items-center gap-4 text-sm">
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>تم الإرسال {sendResults.sent}</span>
+                          </div>
                           <div className="flex items-center gap-2 text-amber-600">
                             <CircleAlert className="w-4 h-4" />
-                            <span>قيد الانتظار: {sendResults.pending}</span>
+                            <span>قيد الانتظار {sendResults.pending}</span>
                           </div>
-                        ) : null}
-                        {sendResults.failed > 0 ? (
-                          <div className="flex items-center gap-2 text-red-600">
-                            <XCircle className="w-4 h-4" />
-                            <span>فشل: {sendResults.failed}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    {localDeviceLinks.length > 0 ? (
-                      <div className="space-y-3 rounded-2xl border border-[#3453a7]/15 bg-[#f8fbff] p-4">
-                        <div>
-                          <h4 className="font-semibold text-[#1a2332]">روابط واتساب على هذا الجهاز</h4>
-                          <p className="mt-1 text-sm text-neutral-600">
-                            هذه روابط فتح مباشرة وليست ربط واتساب محليًا. شغّل العامل المحلي إذا أردت الإرسال الآلي من جهازك{imagePayload ? "، كما أن الصورة لا تُرفق تلقائيًا في هذا الوضع" : ""}.
-                          </p>
                         </div>
-
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {localDeviceLinks.map((link) => (
-                            <div key={link.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#3453a7]/10 bg-white px-3 py-2">
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-[#1a2332]">{link.name}</p>
-                                <p className="text-xs text-neutral-500">{formatGuardianPhoneForDisplay(link.phoneNumber)}</p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => window.open(link.url, "_blank", "noopener,noreferrer")}
-                                className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-700 whitespace-nowrap"
-                              >
-                                فتح واتساب
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
 
                     <Button
                       onClick={handleSendMessages}
@@ -1246,7 +1175,7 @@ export function WhatsAppSendContent({
                 </Card>
               </div>
 
-              <div>
+              <div className="order-1">
                 <Card className="border-2 border-[#3453a7]/20">
                   <CardHeader>
                     <CardTitle className="text-[#1a2332]">اختيار المستلمين</CardTitle>

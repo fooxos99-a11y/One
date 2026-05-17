@@ -508,18 +508,7 @@ export function Header() {
   };
 
   const openWhatsAppEntryPoint = async () => {
-    const latestStatus = await fetchWhatsAppStatus();
-
-    if (latestStatus && latestStatus.workerOnline === false) {
-      handleNav("/admin/whatsapp-send");
-      return;
-    }
-
-    if (!latestStatus && whatsAppStatus?.workerOnline === false) {
-      handleNav("/admin/whatsapp-send");
-      return;
-    }
-
+    await fetchWhatsAppStatus();
     setIsWhatsAppQrDialogOpen(true);
   };
 
