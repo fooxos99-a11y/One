@@ -1496,14 +1496,6 @@ export function Header() {
           </div>
 
           <div className="order-first flex items-center gap-2 md:order-none">
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="site-header-mobile-button inline-flex h-11 w-11 items-center justify-center rounded-full md:hidden"
-              aria-label="فتح القائمة"
-            >
-              <Menu size={22} />
-            </button>
             {authResolved && isLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
