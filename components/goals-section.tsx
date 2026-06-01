@@ -13,6 +13,9 @@ type GoalItem = {
   caption: string
 }
 
+const GOALS_SECTION_CACHE_KEY = 'goals-section-items'
+const GOALS_SECTION_CACHE_MAX_AGE_MS = 15 * 60 * 1000
+
 const ICON_OPTIONS: Array<{ value: string; label: string; icon: LucideIcon }> = [
   { value: 'users', label: 'طلاب', icon: Users },
   { value: 'graduation-cap', label: 'تخرج', icon: GraduationCap },
@@ -46,6 +49,25 @@ function normalizeItems(value: unknown): GoalItem[] {
   return items.length === DEFAULT_GOALS_SECTION_SETTINGS.length ? items : [...DEFAULT_GOALS_SECTION_SETTINGS]
 }
 
+function readCachedItems() {
+  try {
+    const rawItems = localStorage.getItem(GOALS_SECTION_CACHE_KEY)
+    const rawTimestamp = localStorage.getItem(`${GOALS_SECTION_CACHE_KEY}:ts`)
+    if (!rawItems || !rawTimestamp) return null
+    if (Date.now() - Number(rawTimestamp) > GOALS_SECTION_CACHE_MAX_AGE_MS) return null
+    return normalizeItems(JSON.parse(rawItems))
+  } catch {
+    return null
+  }
+}
+
+function writeCachedItems(items: GoalItem[]) {
+  try {
+    localStorage.setItem(GOALS_SECTION_CACHE_KEY, JSON.stringify(items))
+    localStorage.setItem(`${GOALS_SECTION_CACHE_KEY}:ts`, Date.now().toString())
+  } catch {}
+}
+
 export function GoalsSection() {
   const [items, setItems] = useState<GoalItem[]>([...DEFAULT_GOALS_SECTION_SETTINGS])
   const [draftItems, setDraftItems] = useState<GoalItem[]>([...DEFAULT_GOALS_SECTION_SETTINGS])
@@ -56,17 +78,24 @@ export function GoalsSection() {
   useEffect(() => {
     let cancelled = false
 
+    const cachedItems = readCachedItems()
+    if (cachedItems) {
+      setItems(cachedItems)
+      setDraftItems(cachedItems)
+    }
+
     async function loadSection() {
       try {
         const isLoggedIn = typeof window !== 'undefined' && localStorage.getItem('isLoggedIn') === 'true'
         const [sectionResponse, authResponse] = await Promise.all([
-          fetch('/api/goals-section', { cache: 'no-store' }),
+          fetch('/api/goals-section'),
           isLoggedIn ? fetch('/api/auth', { cache: 'no-store' }).catch(() => null) : Promise.resolve(null),
         ])
 
         if (!cancelled && sectionResponse.ok) {
           const sectionData = await sectionResponse.json()
           const nextItems = normalizeItems(sectionData?.items)
+          writeCachedItems(nextItems)
           setItems(nextItems)
           setDraftItems(nextItems)
         }
@@ -114,6 +143,7 @@ export function GoalsSection() {
       }
 
       const nextItems = normalizeItems(data?.items)
+      writeCachedItems(nextItems)
       setItems(nextItems)
       setDraftItems(nextItems)
       setIsDialogOpen(false)

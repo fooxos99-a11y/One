@@ -4,6 +4,12 @@ import { requireRoles } from "@/lib/auth/guards"
 import { getSiteSetting, upsertSiteSetting } from "@/lib/site-settings"
 import { DEFAULT_GOALS_SECTION_SETTINGS, GOALS_SECTION_SETTINGS_ID } from "@/lib/site-settings-constants"
 
+export const revalidate = 300
+
+const goalsSectionCacheHeaders = {
+  "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+}
+
 type GoalSectionItem = {
   icon: string
   value: string
@@ -39,10 +45,10 @@ function normalizeItems(value: unknown): GoalSectionItem[] {
 export async function GET() {
   try {
     const value = await getSiteSetting(GOALS_SECTION_SETTINGS_ID, DEFAULT_GOALS_SECTION_SETTINGS)
-    return NextResponse.json({ items: normalizeItems(value) })
+    return NextResponse.json({ items: normalizeItems(value) }, { headers: goalsSectionCacheHeaders })
   } catch (error) {
     console.error("[goals-section][GET]", error)
-    return NextResponse.json({ items: DEFAULT_GOALS_SECTION_SETTINGS })
+    return NextResponse.json({ items: DEFAULT_GOALS_SECTION_SETTINGS }, { headers: goalsSectionCacheHeaders })
   }
 }
 

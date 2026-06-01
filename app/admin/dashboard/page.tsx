@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -40,41 +41,48 @@ import {
   Zap,
 } from "lucide-react"
 
-import { GlobalAddStudentDialog } from "@/components/global-add-student-dialog"
-import { GlobalEditStudentDialog } from "@/components/admin-modals/global-edit-student-dialog"
-import { AdminsManagementContent } from "@/app/admin/admins/page"
-import { CircleManagementContent } from "@/app/admin/circles/page"
-import { EnrollmentRequestsContent } from "@/app/admin/enrollment-requests/page"
-import { ExamsContent } from "@/app/admin/exams/page"
-import { FinanceContent } from "@/app/admin/finance/page"
-import { GuessImagesManagementContent } from "@/app/admin/guess-images/page"
-import { AuctionQuestionsAdminContent } from "@/app/admin/auction-questions/page"
-import { LetterHiveQuestionsAdminContent } from "@/app/admin/letter-hive-questions/page"
-import { MillionaireQuestionsAdminContent } from "@/app/admin/millionaire-questions/page"
-import { AdminNotificationsContent } from "@/app/admin/notifications/page"
-import { PathwaysContent } from "@/app/admin/pathways/page"
-import { PermissionsContent } from "@/app/admin/permissions/page"
-import { QuestionsDatabaseContent } from "@/app/admin/questions/page"
-import { ReportsPageContent } from "@/app/admin/reports/page"
-import { RecitationDayContent } from "@/app/admin/recitation-day/page"
-import { SemestersContent } from "@/app/admin/semesters/page"
-import { SiteDesignContent } from "@/app/admin/site-design/page"
-import { StoreManagementContent } from "@/app/admin/store-management/page"
-import { StoreOrdersContent } from "@/app/admin/store-orders/page"
-import { StudentRecordsContent } from "@/app/admin/student-records/page"
-import { StudentDailyAttendanceContent } from "@/app/admin/student-daily-attendance/page"
-import { StudentPlansContent } from "@/app/admin/student-plans/page"
-import { StatisticsContent } from "@/app/admin/statistics/page"
-import StudentsAchievementsAdmin from "@/app/admin/students-achievements"
-import { TeacherAttendanceContent } from "@/app/admin/teacher-attendance/page"
-import { TeacherManagementContent } from "@/app/admin/teachers/page"
-import { WhatsAppSendContent } from "@/app/admin/whatsapp-send/page"
 import { WhatsAppQrDialog } from "@/components/whatsapp-qr-dialog"
 import { WhatsAppQueueIndicator } from "@/components/whatsapp-queue-indicator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { hasPermissionAccess } from "@/lib/admin-permissions"
+import { GlobalAddStudentDialog } from "@/components/global-add-student-dialog"
+import { GlobalEditStudentDialog } from "@/components/admin-modals/global-edit-student-dialog"
+
+const inlineContentLoader = () => (
+  <div className="flex min-h-[320px] items-center justify-center">
+    <SiteLoader size="lg" />
+  </div>
+)
+
+const AdminsManagementContent = dynamic(() => import("@/app/admin/admins/page").then((mod) => mod.AdminsManagementContent), { ssr: false, loading: inlineContentLoader })
+const CircleManagementContent = dynamic(() => import("@/app/admin/circles/page").then((mod) => mod.CircleManagementContent), { ssr: false, loading: inlineContentLoader })
+const EnrollmentRequestsContent = dynamic(() => import("@/app/admin/enrollment-requests/page").then((mod) => mod.EnrollmentRequestsContent), { ssr: false, loading: inlineContentLoader })
+const ExamsContent = dynamic(() => import("@/app/admin/exams/page").then((mod) => mod.ExamsContent), { ssr: false, loading: inlineContentLoader })
+const FinanceContent = dynamic(() => import("@/app/admin/finance/page").then((mod) => mod.FinanceContent), { ssr: false, loading: inlineContentLoader })
+const GuessImagesManagementContent = dynamic(() => import("@/app/admin/guess-images/page").then((mod) => mod.GuessImagesManagementContent), { ssr: false, loading: inlineContentLoader })
+const AuctionQuestionsAdminContent = dynamic(() => import("@/app/admin/auction-questions/page").then((mod) => mod.AuctionQuestionsAdminContent), { ssr: false, loading: inlineContentLoader })
+const LetterHiveQuestionsAdminContent = dynamic(() => import("@/app/admin/letter-hive-questions/page").then((mod) => mod.LetterHiveQuestionsAdminContent), { ssr: false, loading: inlineContentLoader })
+const MillionaireQuestionsAdminContent = dynamic(() => import("@/app/admin/millionaire-questions/page").then((mod) => mod.MillionaireQuestionsAdminContent), { ssr: false, loading: inlineContentLoader })
+const AdminNotificationsContent = dynamic(() => import("@/app/admin/notifications/page").then((mod) => mod.AdminNotificationsContent), { ssr: false, loading: inlineContentLoader })
+const PathwaysContent = dynamic(() => import("@/app/admin/pathways/page").then((mod) => mod.PathwaysContent), { ssr: false, loading: inlineContentLoader })
+const PermissionsContent = dynamic(() => import("@/app/admin/permissions/page").then((mod) => mod.PermissionsContent), { ssr: false, loading: inlineContentLoader })
+const QuestionsDatabaseContent = dynamic(() => import("@/app/admin/questions/page").then((mod) => mod.QuestionsDatabaseContent), { ssr: false, loading: inlineContentLoader })
+const ReportsPageContent = dynamic(() => import("@/app/admin/reports/page").then((mod) => mod.ReportsPageContent), { ssr: false, loading: inlineContentLoader })
+const RecitationDayContent = dynamic(() => import("@/app/admin/recitation-day/page").then((mod) => mod.RecitationDayContent), { ssr: false, loading: inlineContentLoader })
+const SemestersContent = dynamic(() => import("@/app/admin/semesters/page").then((mod) => mod.SemestersContent), { ssr: false, loading: inlineContentLoader })
+const SiteDesignContent = dynamic(() => import("@/app/admin/site-design/page").then((mod) => mod.SiteDesignContent), { ssr: false, loading: inlineContentLoader })
+const StoreManagementContent = dynamic(() => import("@/app/admin/store-management/page").then((mod) => mod.StoreManagementContent), { ssr: false, loading: inlineContentLoader })
+const StoreOrdersContent = dynamic(() => import("@/app/admin/store-orders/page").then((mod) => mod.StoreOrdersContent), { ssr: false, loading: inlineContentLoader })
+const StudentRecordsContent = dynamic(() => import("@/app/admin/student-records/page").then((mod) => mod.StudentRecordsContent), { ssr: false, loading: inlineContentLoader })
+const StudentDailyAttendanceContent = dynamic(() => import("@/app/admin/student-daily-attendance/page").then((mod) => mod.StudentDailyAttendanceContent), { ssr: false, loading: inlineContentLoader })
+const StudentPlansContent = dynamic(() => import("@/app/admin/student-plans/page").then((mod) => mod.StudentPlansContent), { ssr: false, loading: inlineContentLoader })
+const StatisticsContent = dynamic(() => import("@/app/admin/statistics/page").then((mod) => mod.StatisticsContent), { ssr: false, loading: inlineContentLoader })
+const StudentsAchievementsAdmin = dynamic(() => import("@/app/admin/students-achievements"), { ssr: false, loading: inlineContentLoader })
+const TeacherAttendanceContent = dynamic(() => import("@/app/admin/teacher-attendance/page").then((mod) => mod.TeacherAttendanceContent), { ssr: false, loading: inlineContentLoader })
+const TeacherManagementContent = dynamic(() => import("@/app/admin/teachers/page").then((mod) => mod.TeacherManagementContent), { ssr: false, loading: inlineContentLoader })
+const WhatsAppSendContent = dynamic(() => import("@/app/admin/whatsapp-send/page").then((mod) => mod.WhatsAppSendContent), { ssr: false, loading: inlineContentLoader })
 
 type DashboardContext = {
   hasPermission: (permission: string) => boolean
