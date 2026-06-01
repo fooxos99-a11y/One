@@ -180,8 +180,7 @@ export function TeacherAttendanceModal({
               <CheckCircle2 className="h-20 w-20 text-green-500" />
             </div>
             <h2 className="mb-2 text-2xl font-black text-[#1a2332]">تم التحضير بنجاح</h2>
-            <p className="text-base leading-8 text-[#5b6475]">شكراً لك</p>
-          </div>
+            <p className="text-base leading-8 text-[#5b6475]">شكراً لك</p>          </div>
         </DialogContent>
       </Dialog>
     )
@@ -206,8 +205,7 @@ export function TeacherAttendanceModal({
             <Button
               variant="outline"
               onClick={onClose}
-              className="mt-0 h-12 min-w-[120px] rounded-xl border border-[#3453a7]/35 bg-white px-5 text-base font-bold text-[#3453a7] shadow-none hover:bg-[#f7f9ff] hover:text-[#274187]"
-            >
+              className="mt-0 h-12 min-w-[120px] rounded-xl border border-[#3453a7]/35 bg-white px-5 text-base font-bold text-[#3453a7] shadow-none hover:bg-[#f7f9ff] hover:text-[#274187]"            >
               إغلاق
             </Button>
           </div>
@@ -230,8 +228,7 @@ export function TeacherAttendanceModal({
               <Clock className="h-5 w-5 text-[#3453a7]" />
               <span className="text-sm font-semibold text-[#1a2332]">الوقت الحالي</span>
             </div>
-            <div className="font-mono text-3xl font-bold text-[#1a2332]">{currentTime || "00:00:00"}</div>
-          </div>
+            <div className="font-mono text-3xl font-bold text-[#1a2332]">{currentTime || "00:00:00"}</div>          </div>
         </div>
 
         {/* Action Buttons */}
@@ -239,15 +236,13 @@ export function TeacherAttendanceModal({
           <Button
             variant="outline"
             onClick={() => !isSubmitting && onClose()}
-            className="mt-0 h-12 min-w-[120px] rounded-xl border border-[#3453a7]/35 bg-white px-5 text-base font-bold text-[#3453a7] shadow-none hover:bg-[#f7f9ff] hover:text-[#274187] disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isSubmitting}
+            className="mt-0 h-12 min-w-[120px] rounded-xl border border-[#3453a7]/35 bg-white px-5 text-base font-bold text-[#3453a7] shadow-none hover:bg-[#f7f9ff] hover:text-[#274187] disabled:opacity-50 disabled:cursor-not-allowed"            disabled={isSubmitting}
           >
             إلغاء
           </Button>
           <Button
             onClick={() => handleAttendance("present")}
-            className="h-12 min-w-[120px] rounded-xl border border-[#3453a7]/30 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] px-5 text-base font-bold text-white shadow-none transition-colors hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isSubmitting}
+            className="h-12 min-w-[120px] rounded-xl border border-[#3453a7]/30 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] px-5 text-base font-bold text-white shadow-none transition-colors hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed"            disabled={isSubmitting}
           >
             {isSubmitting ? "جاري التحضير..." : "حاضر"}
           </Button>

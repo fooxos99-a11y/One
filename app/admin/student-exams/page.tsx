@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation"
 
-export default function AdminStudentExamsPage({
+export default async function AdminStudentExamsPage({
   searchParams,
 }: {
-  searchParams?: {
+  searchParams?: Promise<{
     embedded?: string
-  }
+  }>
 }) {
+  const resolvedSearchParams = await searchParams
   const params = new URLSearchParams()
   params.set("action", "student-exams")
 
-  if (searchParams?.embedded === "1") {
+  if (resolvedSearchParams?.embedded === "1") {
     params.set("embedded", "1")
   }
 

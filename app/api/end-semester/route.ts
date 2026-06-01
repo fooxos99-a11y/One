@@ -222,15 +222,6 @@ export async function POST(request: Request) {
     const { data: allStudents, error: allStudentsError } = await supabase
       .from("students")
       .select("id, memorized_start_surah, memorized_start_verse, memorized_end_surah, memorized_end_verse, memorized_ranges")
-
-    if (studentsError) {
-      return NextResponse.json({ error: studentsError.message || "فشل في جلب الطلاب" }, { status: 500 })
-    }
-
-    if (allStudentsError) {
-      return NextResponse.json({ error: allStudentsError.message || "فشل في جلب الطلاب" }, { status: 500 })
-    }
-
     const latestPlanByStudentId = new Map<string, any>()
     for (const plan of plans || []) {
       const studentId = String(plan.student_id || "")
@@ -256,8 +247,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const studentUpdates = (allStudents || []).map((student) => {
-      const plan = latestPlanByStudentId.get(String(student.id))
+    const studentUpdates = (allStudents || []).map((student) => {      const plan = latestPlanByStudentId.get(String(student.id))
       const updateData: Record<string, unknown> = {
         id: student.id,
         points: 0,

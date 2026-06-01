@@ -55,6 +55,19 @@ function isMissingStudentHafizExtrasTable(error: unknown) {
   return /student_hafiz_extras/i.test(message) && /does not exist|not exist|relation|table/i.test(message)
 }
 
+function normalizeAutoSendMode(value: unknown): "daily" | "weekly" | "none" {
+  if (value === "weekly" || value === "none") {
+    return value
+  }
+
+  return "daily"
+}
+
+function isMissingGuardianReportModeColumn(error: unknown) {
+  const message = String((error as { message?: string } | null)?.message || error || "")
+  return /guardian_report_mode/i.test(message) && /does not exist|not exist|column/i.test(message)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireRoles(request, ["teacher", "deputy_teacher", "admin", "supervisor"])
@@ -171,6 +184,7 @@ export async function POST(request: NextRequest) {
         missingGuardianPhone: 0,
         invalidPhone: 0,
         missingData: 0,
+        modeDisabled: 0,
         other: 0,
       },
     }
@@ -185,6 +199,7 @@ export async function POST(request: NextRequest) {
       }
 
       const status = attendance || "present"
+      const autoSendMode = normalizeAutoSendMode(student?.autoSendMode)
       const isAbsent = isNonEvaluatedAttendance(status)
       const hafiz_level = isAbsent ? "not_completed" : (evaluation?.hafiz || "not_completed")
       const tikrar_level = isAbsent ? "not_completed" : (evaluation?.tikrar || "not_completed")
@@ -193,6 +208,23 @@ export async function POST(request: NextRequest) {
       const hafizExtraPages = isAbsent ? null : normalizeHafizExtraPages(student?.hafizExtraPages)
       const hafizExtraPoints = getHafizExtraPoints(hafizExtraPages)
       const normalizedNotes = typeof notes === "string" && notes.trim() ? notes.trim() : null
+
+      const { error: autoSendModeUpdateError } = await supabase
+        .from("students")
+        .update({ guardian_report_mode: autoSendMode })
+        .eq("id", student_id)
+
+      if (autoSendModeUpdateError) {
+        return NextResponse.json(
+          {
+            error: isMissingGuardianReportModeColumn(autoSendModeUpdateError)
+              ? "عمود وضع الإرسال التلقائي غير موجود بعد. نفذ ملف add_guardian_report_mode.sql ثم أعد المحاولة."
+              : "فشل في حفظ وضع الإرسال التلقائي",
+            student_id,
+          },
+          { status: isMissingGuardianReportModeColumn(autoSendModeUpdateError) ? 503 : 500 },
+        )
+      }
 
       console.log(`[DEBUG][API] الطالب: ${student_id}, الحضور: ${status}, التقييمات المدخلة:`, evaluation)
       console.log(`[DEBUG][API] القيم التي سيتم حفظها: hafiz=${hafiz_level}, tikrar=${tikrar_level}, samaa=${samaa_level}, rabet=${rabet_level}`)
@@ -411,36 +443,41 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        const whatsappResult = await sendAttendanceSaveGuardianNotification({
-          supabase,
-          studentId: student_id,
-          date: todayDate,
-          status,
-          performedByUserId: effectiveTeacherId,
-          templates: attendanceTemplates,
-          studentData: studentRow,
-          evaluation: {
-            hafiz: hafiz_level,
-            tikrar: tikrar_level,
-            samaa: samaa_level,
-            rabet: rabet_level,
-          },
-          hafizAmount: buildHafizAmountLabel({
-            fromSurah: readingDetails?.hafiz?.fromSurah,
-            fromVerse: readingDetails?.hafiz?.fromVerse,
-            toSurah: readingDetails?.hafiz?.toSurah,
-            toVerse: readingDetails?.hafiz?.toVerse,
-          }),
-        })
-        if (whatsappResult.queued) {
-          whatsappSummary.queuedCount += 1
+        if (autoSendMode === "daily") {
+          const whatsappResult = await sendAttendanceSaveGuardianNotification({
+            supabase,
+            studentId: student_id,
+            date: todayDate,
+            status,
+            performedByUserId: effectiveTeacherId,
+            templates: attendanceTemplates,
+            studentData: studentRow,
+            evaluation: {
+              hafiz: hafiz_level,
+              tikrar: tikrar_level,
+              samaa: samaa_level,
+              rabet: rabet_level,
+            },
+            hafizAmount: buildHafizAmountLabel({
+              fromSurah: readingDetails?.hafiz?.fromSurah,
+              fromVerse: readingDetails?.hafiz?.fromVerse,
+              toSurah: readingDetails?.hafiz?.toSurah,
+              toVerse: readingDetails?.hafiz?.toVerse,
+            }),
+          })
+          if (whatsappResult.queued) {
+            whatsappSummary.queuedCount += 1
+          } else {
+            whatsappSummary.skippedCount += 1
+            if (whatsappResult.reason === "duplicate") whatsappSummary.skippedReasons.duplicate += 1
+            else if (whatsappResult.reason === "missing-guardian-phone") whatsappSummary.skippedReasons.missingGuardianPhone += 1
+            else if (whatsappResult.reason === "invalid-phone") whatsappSummary.skippedReasons.invalidPhone += 1
+            else if (whatsappResult.reason === "missing-data") whatsappSummary.skippedReasons.missingData += 1
+            else whatsappSummary.skippedReasons.other += 1
+          }
         } else {
           whatsappSummary.skippedCount += 1
-          if (whatsappResult.reason === "duplicate") whatsappSummary.skippedReasons.duplicate += 1
-          else if (whatsappResult.reason === "missing-guardian-phone") whatsappSummary.skippedReasons.missingGuardianPhone += 1
-          else if (whatsappResult.reason === "invalid-phone") whatsappSummary.skippedReasons.invalidPhone += 1
-          else if (whatsappResult.reason === "missing-data") whatsappSummary.skippedReasons.missingData += 1
-          else whatsappSummary.skippedReasons.other += 1
+          whatsappSummary.skippedReasons.modeDisabled += 1
         }
         results.push({ student_id, success: true, pointsAdded: totalPoints + hafizExtraPoints })
       } else {
@@ -476,24 +513,29 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        const whatsappResult = await sendAttendanceSaveGuardianNotification({
-          supabase,
-          studentId: student_id,
-          date: todayDate,
-          status,
-          performedByUserId: effectiveTeacherId,
-          templates: attendanceTemplates,
-          studentData: studentRow,
-        })
-        if (whatsappResult.queued) {
-          whatsappSummary.queuedCount += 1
+        if (autoSendMode === "daily") {
+          const whatsappResult = await sendAttendanceSaveGuardianNotification({
+            supabase,
+            studentId: student_id,
+            date: todayDate,
+            status,
+            performedByUserId: effectiveTeacherId,
+            templates: attendanceTemplates,
+            studentData: studentRow,
+          })
+          if (whatsappResult.queued) {
+            whatsappSummary.queuedCount += 1
+          } else {
+            whatsappSummary.skippedCount += 1
+            if (whatsappResult.reason === "duplicate") whatsappSummary.skippedReasons.duplicate += 1
+            else if (whatsappResult.reason === "missing-guardian-phone") whatsappSummary.skippedReasons.missingGuardianPhone += 1
+            else if (whatsappResult.reason === "invalid-phone") whatsappSummary.skippedReasons.invalidPhone += 1
+            else if (whatsappResult.reason === "missing-data") whatsappSummary.skippedReasons.missingData += 1
+            else whatsappSummary.skippedReasons.other += 1
+          }
         } else {
           whatsappSummary.skippedCount += 1
-          if (whatsappResult.reason === "duplicate") whatsappSummary.skippedReasons.duplicate += 1
-          else if (whatsappResult.reason === "missing-guardian-phone") whatsappSummary.skippedReasons.missingGuardianPhone += 1
-          else if (whatsappResult.reason === "invalid-phone") whatsappSummary.skippedReasons.invalidPhone += 1
-          else if (whatsappResult.reason === "missing-data") whatsappSummary.skippedReasons.missingData += 1
-          else whatsappSummary.skippedReasons.other += 1
+          whatsappSummary.skippedReasons.modeDisabled += 1
         }
         results.push({ student_id, success: true, pointsAdded: 0 })
       }

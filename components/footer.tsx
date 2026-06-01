@@ -20,8 +20,7 @@ export function Footer() {
         <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-12">
           <div className="col-span-2 md:col-span-1">
             <h3 className="mb-6 text-2xl font-black text-white">من نحن</h3>
-            <p className="text-base leading-8 text-white/80">
-              مجمع الملك خالد لتحفيظ القرآن الكريم، يسعى لتقديم بيئة تربوية متميزة تجمع بين الأصالة والمعاصرة.
+            <p className="text-base leading-8 text-white/80">              مجمع الملك خالد لتحفيظ القرآن الكريم، يسعى لتقديم بيئة تربوية متميزة تجمع بين الأصالة والمعاصرة.
               نهدف إلى تخريج جيل قرآني متقن لكتاب الله، ملتزم بتعاليمه، قادر على خدمة دينه ومجتمعه. مع التركيز على
               الجودة والإتقان والمتابعة المستمرة لكل طالب.
             </p>
@@ -32,23 +31,19 @@ export function Footer() {
               <h3 className="mb-6 text-right text-xl font-black text-white md:text-center">روابط سريعة</h3>
               <ul className="space-y-3">
                 <li>
-                  <Link href="/" className="text-white/80 transition-colors hover:text-white">
-                    الرئيسية
+                  <Link href="/" className="text-white/80 transition-colors hover:text-white">                    الرئيسية
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="text-white/80 transition-colors hover:text-white">
-                    شروط الخدمة
+                  <Link href="/terms" className="text-white/80 transition-colors hover:text-white">                    شروط الخدمة
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="text-white/80 transition-colors hover:text-white">
-                    سياسة الخصوصية
+                  <Link href="/privacy" className="text-white/80 transition-colors hover:text-white">                    سياسة الخصوصية
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="text-white/80 transition-colors hover:text-white">
-                    اتصل بنا
+                  <Link href="/contact" className="text-white/80 transition-colors hover:text-white">                    اتصل بنا
                   </Link>
                 </li>
               </ul>
@@ -67,8 +62,7 @@ export function Footer() {
                 <span>info@example.com</span>
               </li>
               <li className="flex items-center gap-3 text-white/80">
-                <MapPin className="h-5 w-5 text-white" />
-                <span>السعودية، بريدة</span>
+                <MapPin className="h-5 w-5 text-white" />                <span>السعودية، بريدة</span>
               </li>
             </ul>
           </div>

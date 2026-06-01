@@ -94,14 +94,12 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
           <AlertDialogFooter className="mt-4 flex-row-reverse gap-3 sm:flex-row-reverse sm:justify-start">
             <AlertDialogCancel
               onClick={handleCancel}
-              className="mt-0 h-12 min-w-[120px] rounded-xl border border-[#3453a7]/35 bg-white px-5 text-base font-bold text-[#3453a7] shadow-none hover:bg-[#f7f9ff] hover:text-[#274187] focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/20"
-            >
+              className="mt-0 h-12 min-w-[120px] rounded-xl border border-[#3453a7]/35 bg-white px-5 text-base font-bold text-[#3453a7] shadow-none hover:bg-[#f7f9ff] hover:text-[#274187] focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/20"            >
               {confirm.cancelText}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirm}
-              className="h-12 min-w-[160px] rounded-xl border border-[#3453a7]/30 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] px-5 text-base font-bold text-white shadow-none transition-colors hover:brightness-105 focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/20"
-            >
+              className="h-12 min-w-[160px] rounded-xl border border-[#3453a7]/30 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] px-5 text-base font-bold text-white shadow-none transition-colors hover:brightness-105 focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/20"            >
               {confirm.confirmText}
             </AlertDialogAction>
           </AlertDialogFooter>

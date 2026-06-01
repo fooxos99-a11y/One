@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireRoles } from "@/lib/auth/guards"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
+  const auth = await requireRoles(request, ["admin", "supervisor"])
+  if ("response" in auth) {
+    return auth.response
+  }
+
+  const supabase = createAdminClient()
 
   // جلب جميع الطلاب
   const { data: students, error: studentsError } = await supabase

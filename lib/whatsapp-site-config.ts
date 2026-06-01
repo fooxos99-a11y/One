@@ -3,3 +3,4 @@ export const WHATSAPP_HISTORY_TABLE = process.env.WHATSAPP_HISTORY_TABLE || "wha
 export const WHATSAPP_REPLIES_TABLE = process.env.WHATSAPP_REPLIES_TABLE || "whatsapp_replies"
 export const WHATSAPP_WORKER_STATE_SETTING_ID = process.env.WHATSAPP_WORKER_STATE_SETTING_ID || "whatsapp_worker_state"
 export const WHATSAPP_WORKER_COMMAND_SETTING_ID = process.env.WHATSAPP_WORKER_COMMAND_SETTING_ID || "whatsapp_worker_command"
+export const WHATSAPP_DELIVERY_MODE_SETTING_ID = process.env.WHATSAPP_DELIVERY_MODE_SETTING_ID || "whatsapp_delivery_mode"

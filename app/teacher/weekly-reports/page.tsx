@@ -24,7 +24,6 @@ function getStoredTeacherHalaqah() {
     return String(localStorage.getItem("userHalaqah") || "").trim();
   }
 }
-
 export default function TeacherWeeklyReportsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -56,8 +55,7 @@ export default function TeacherWeeklyReportsPage() {
           teacherHalaqah = getStoredTeacherHalaqah();
         }
 
-        if (!teacherHalaqah) {
-          setError("لا توجد حلقة مرتبطة بهذا المعلم");
+        if (!teacherHalaqah) {          setError("لا توجد حلقة مرتبطة بهذا المعلم");
           setTeacherCircle("");
           return;
         }
@@ -71,8 +69,7 @@ export default function TeacherWeeklyReportsPage() {
         } else {
           const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
           setError(`تعذر تحميل حلقة المعلم: ${message}`);
-        }
-      } finally {
+        }      } finally {
         setLoading(false);
       }
     }

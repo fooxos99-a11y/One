@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
 
 export default function LoginPage() {
-  redirect("/?login=1")
-}
+  redirect("/?login=1")}

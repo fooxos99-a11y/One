@@ -208,8 +208,7 @@ export function CircleWeeklyReports({
   showBackButton = true,
   displayMode = "page",
   onBack,
-}: CircleWeeklyReportsProps) {
-  const [loading, setLoading] = useState(true);
+}: CircleWeeklyReportsProps) {  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [students, setStudents] = useState<StudentCardData[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -284,8 +283,7 @@ export function CircleWeeklyReports({
                 >
                   <ArrowRight className="h-4.5 w-4.5" />
                 </Link>
-              ) : <div />
-            ) : null}
+              ) : <div />            ) : null}
             <div className="text-center">
               <h1 className="text-2xl font-black text-[#1f2937]">{TEXT.titleSuffix}</h1>
               <p className="mt-2 text-sm font-bold text-[#64748b]">{circleName}</p>
@@ -306,8 +304,7 @@ export function CircleWeeklyReports({
           ) : (
             <section className="space-y-4">
               <div className="rounded-[24px] border border-[#e5e7eb] bg-[#fcfcfb] px-4 py-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <div className="flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-2 py-1 shadow-sm">
+                <div className="flex flex-wrap items-center justify-center gap-3">                  <div className="flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-2 py-1 shadow-sm">
                     <button
                       type="button"
                       onClick={() => setWeekOffset((currentOffset) => Math.max(0, currentOffset - 1))}
@@ -343,8 +340,7 @@ export function CircleWeeklyReports({
                       </div>
 
                       <div className="rounded-[20px] border border-[#eef2f6] bg-[#fcfdff] p-3">
-                        <div className="space-y-3">
-                          <ProgressRow
+                        <div className="space-y-3">                          <ProgressRow
                             label={TEXT.weeklyAttendance}
                             completed={student.presentCount}
                             target={attendanceTargetCount}
@@ -381,8 +377,7 @@ export function CircleWeeklyReports({
                           />
                         </div>
 
-                        <div className="mt-3 flex flex-wrap gap-2 border-t border-dashed border-[#e2e8f0] pt-3">
-                          <MetricSummaryPill label={TEXT.memorizedPages} value={formatMetric(student.memorized)} toneClass="bg-[#f0fdf4]" />
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-dashed border-[#e2e8f0] pt-3">                          <MetricSummaryPill label={TEXT.memorizedPages} value={formatMetric(student.memorized)} toneClass="bg-[#f0fdf4]" />
                           <MetricSummaryPill label={TEXT.revisedPages} value={formatMetric(student.revised)} toneClass="bg-[#eff6ff]" />
                           <MetricSummaryPill label={TEXT.tiedPages} value={formatMetric(student.tied)} toneClass="bg-[#fffbeb]" />
                         </div>
@@ -405,8 +400,7 @@ export function CircleWeeklyReports({
     <div className="min-h-screen bg-[#fafaf9] font-cairo" dir="rtl">
       <Header />
       <main className="px-4 py-10">
-        <div className="container mx-auto max-w-7xl">{content}</div>
-      </main>
+        <div className="container mx-auto max-w-7xl">{content}</div>      </main>
       <Footer />
     </div>
   );

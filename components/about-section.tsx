@@ -53,8 +53,7 @@ export function AboutSection() {
                   <p className="mt-3 text-base leading-8 text-[#5f6b80]">{highlight.description}</p>
                 </div>
               )
-            })}
-          </div>
+            })}          </div>
         </div>
       </div>
     </section>

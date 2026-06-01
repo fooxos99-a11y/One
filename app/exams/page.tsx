@@ -298,6 +298,7 @@ export default function StudentExamsPage() {
                     </div>
                     <span className="text-sm font-black">لا يوجد لديك موعد اختبار</span>
                   </div>
+                  <div className="mt-2 text-sm font-semibold text-[#64748b]">سيظهر هنا مباشرة عند تحديد موعد جديد لك.</div>
                 </div>
               </div>
             </div>
@@ -311,8 +312,7 @@ export default function StudentExamsPage() {
               >
                 <BookOpenCheck className="h-10 w-10 text-white" />
               </div>
-              <p className="text-xl font-black text-[#1f2937]">لايوجد لديك اختبارات</p>
-            </div>
+              <p className="text-xl font-black text-[#1f2937]">لايوجد لديك اختبارات</p>            </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 md:gap-6">
               {displayedJuzs.map((juzNumber) => {

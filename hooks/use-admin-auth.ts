@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";import { useRouter } from "next/navigation";
 import { hasPermissionAccess } from "@/lib/admin-permissions";
 
 interface AdminAuthState {
@@ -27,8 +26,7 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
     isFullAccess: false,
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  useEffect(() => {    let cancelled = false;
 
     async function verify() {
       try {
@@ -47,8 +45,7 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
         const freshRole = roleName || normalizedRole;
         const accountNumber = String(sessionUser?.accountNumber || "").trim();
 
-        if (!normalizedRole || !accountNumber) {
-          localStorage.removeItem("isLoggedIn");
+        if (!normalizedRole || !accountNumber) {          localStorage.removeItem("isLoggedIn");
           localStorage.removeItem("userRole");
           router.replace("/login");
           return;
@@ -58,14 +55,12 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
 
         // 2. Reject students and teachers immediately
         if (normalizedRole === "student" || normalizedRole === "teacher" || normalizedRole === "deputy_teacher") {
-          localStorage.setItem("userRole", normalizedRole);
-          router.replace("/login");
+          localStorage.setItem("userRole", normalizedRole);          router.replace("/login");
           return;
         }
 
         // 3. account_number=2 always has full access to everything
-        if (Number(accountNumber) === 2) {
-          localStorage.setItem("userRole", freshRole);
+        if (Number(accountNumber) === 2) {          localStorage.setItem("userRole", freshRole);
           if (!cancelled) {
             setState({ isLoading: false, isVerified: true, role: freshRole, isFullAccess: true });
           }
@@ -87,15 +82,13 @@ export function useAdminAuth(permissionKey?: string): AdminAuthState {
         const allAdminRoles = ["admin", "مدير", ...validRoles];
         const isKnownAdminRole = allAdminRoles.includes(freshRole) || normalizedRole === "admin" || normalizedRole === "supervisor";
 
-        if (!isKnownAdminRole) {
-          localStorage.setItem("userRole", freshRole);
+        if (!isKnownAdminRole) {          localStorage.setItem("userRole", freshRole);
           router.replace("/login");
           return;
         }
 
         const isFullAccess = freshRole === "مدير" || freshRole === "admin";
-        const rolePermissions: string[] = permissionsMap[freshRole] || permissionsMap[normalizedRole] || [];
-        const hasAll = isFullAccess || rolePermissions.includes("all");
+        const rolePermissions: string[] = permissionsMap[freshRole] || permissionsMap[normalizedRole] || [];        const hasAll = isFullAccess || rolePermissions.includes("all");
 
         // 5. If a specific permission key is required, check it
         if (permissionKey && !hasPermissionAccess(rolePermissions, permissionKey, hasAll)) {
