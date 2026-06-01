@@ -136,6 +136,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         <div>
           <Input
             id="accountNumber"
+            name="accountNumber"
             type="text"
             placeholder="أدخل رقم الحساب"
             value={accountNumber}
