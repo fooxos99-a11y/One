@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { AlertTriangle, CheckCircle2, LogOut, Play, Smartphone } from "lucide-react"
+import { AlertTriangle, CheckCircle2, LogOut, Smartphone } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -32,6 +32,8 @@ type WhatsAppQrDialogProps = {
   onOpenChange: (open: boolean) => void
   initialStatus?: Partial<WhatsAppStatusResponse> | null
 }
+
+type WhatsAppDeliveryMode = "local" | "cloud"
 
 function shouldLogStatusFetchError(error: unknown) {
   if (error instanceof DOMException && error.name === "AbortError") {
@@ -131,10 +133,7 @@ function getStatusUi(status: WhatsAppStatusResponse, isStartingWorker: boolean, 
   if (!status.workerOnline) {
     return {
       label: status.workerMode === "local" ? "عامل واتساب المحلي غير متصل" : "عامل واتساب غير متصل",
-      description:
-        status.workerMode === "local"
-          ? "العامل المحلي على هذا الجهاز غير شغال حالياً. سيحاول النظام تشغيله تلقائياً، وإذا لم يبدأ فراجع ملف .env.local-worker."
-          : "الخادم المسؤول عن واتساب غير متصل حالياً.",
+      description: "الخادم المسؤول عن واتساب غير متصل حالياً.",
     }
   }
 
@@ -196,10 +195,12 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
   const confirmDialog = useConfirmDialog()
   const alertDialog = useAlertDialog()
   const [status, setStatus] = useState<WhatsAppStatusResponse>(DEFAULT_STATUS)
+  const [deliveryMode, setDeliveryMode] = useState<WhatsAppDeliveryMode>("cloud")
   const [isLoadingStatus, setIsLoadingStatus] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isStartingWorker, setIsStartingWorker] = useState(false)
+  const [isUpdatingMode, setIsUpdatingMode] = useState(false)
   const [startupError, setStartupError] = useState<string | null>(null)
   const hasAttemptedAutoStartRef = useRef(false)
 
@@ -208,6 +209,20 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
   const canDisconnect = isConnected && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed, isStartingWorker)
   const qrImageSrc = status.qrImageUrl
+
+  const fetchDeliveryMode = async () => {
+    try {
+      const response = await fetch(`/api/whatsapp/mode?t=${Date.now()}`, { cache: "no-store" })
+      if (!response.ok) {
+        throw new Error("تعذر جلب وضع الإرسال")
+      }
+
+      const data = (await response.json()) as { mode?: string }
+      setDeliveryMode(data.mode === "cloud" ? "cloud" : "local")
+    } catch (error) {
+      console.error("[whatsapp-qr-dialog] fetch mode:", error)
+    }
+  }
 
   const ensureWorkerStarted = async () => {
     try {
@@ -285,13 +300,18 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
         ...current,
         ...initialStatus,
       }))
+
+      if (initialStatus.workerMode === "cloud" || initialStatus.workerMode === "local") {
+        setDeliveryMode(initialStatus.workerMode)
+      }
     }
 
+    void fetchDeliveryMode()
     void fetchStatus()
   }, [open, initialStatus])
 
   useEffect(() => {
-    if (!open || status.workerOnline || hasAttemptedAutoStartRef.current) {
+    if (!open || deliveryMode !== "local" || status.workerOnline || hasAttemptedAutoStartRef.current) {
       return
     }
 
@@ -305,19 +325,43 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
 
       setStartupError(result.error)
     })
-  }, [open, status.workerOnline])
+  }, [deliveryMode, open, status.workerOnline])
 
-  const handleStartWorker = async () => {
-    const result = await ensureWorkerStarted()
-    if (!result.success) {
-      setStartupError(result.error)
-      await alertDialog(result.error, "تعذر التشغيل")
+  const handleDeliveryModeChange = async (nextMode: WhatsAppDeliveryMode) => {
+    if (nextMode === deliveryMode || isUpdatingMode) {
       return
     }
 
-    setStartupError(null)
-    await alertDialog(result.message, "تم")
-    await fetchStatus()
+    try {
+      setIsUpdatingMode(true)
+
+      const response = await fetch("/api/whatsapp/mode", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: nextMode }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || "تعذر تحديث وضع الإرسال")
+      }
+
+      setDeliveryMode(nextMode)
+      setStartupError(null)
+
+      if (nextMode === "local") {
+        const result = await ensureWorkerStarted()
+        if (!result.success) {
+          setStartupError(result.error)
+        }
+      }
+
+      await fetchStatus()
+    } catch (error) {
+      await alertDialog(error instanceof Error ? error.message : "تعذر تحديث وضع الإرسال", "خطأ")
+    } finally {
+      setIsUpdatingMode(false)
+    }
   }
 
   useEffect(() => {
@@ -437,6 +481,31 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
                 يجب أن يكون الهاتف والجهاز المرتبط به الباركود متصلين بالإنترنت أثناء إرسال الرسائل.
               </p>
 
+              <p className="text-right text-sm font-bold leading-7 text-[#64748b]">
+                * إذا لم يعمل العامل السحابي استخدم العامل المحلي
+              </p>
+
+              <div className="flex items-center justify-start gap-2">
+                <Button
+                  type="button"
+                  variant={deliveryMode === "local" ? "default" : "outline"}
+                  onClick={() => void handleDeliveryModeChange("local")}
+                  disabled={isUpdatingMode}
+                  className="h-10 rounded-2xl px-4 text-sm font-black"
+                >
+                  العامل المحلي
+                </Button>
+                <Button
+                  type="button"
+                  variant={deliveryMode === "cloud" ? "default" : "outline"}
+                  onClick={() => void handleDeliveryModeChange("cloud")}
+                  disabled={isUpdatingMode}
+                  className="h-10 rounded-2xl px-4 text-sm font-black"
+                >
+                  العامل السحابي
+                </Button>
+              </div>
+
               {canDisconnect ? (
                 <div className="flex justify-start">
                   <Button
@@ -452,20 +521,6 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
                 </div>
               ) : null}
 
-              {!status.workerOnline ? (
-                <div className="flex justify-start">
-                  <Button
-                    type="button"
-                    onClick={handleStartWorker}
-                    disabled={isStartingWorker}
-                    size="icon"
-                    aria-label="تشغيل عامل واتساب"
-                    className="h-10 w-10 rounded-2xl bg-[#3453a7] text-white hover:bg-[#2c478d]"
-                  >
-                    <Play className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : null}
             </div>
           </DialogHeader>
 

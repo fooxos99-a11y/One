@@ -3,6 +3,7 @@ import path from "path"
 import { spawn } from "child_process"
 import { NextResponse } from "next/server"
 import { requireRoles } from "@/lib/auth/guards"
+import { readWhatsAppDeliveryMode } from "@/lib/whatsapp-delivery-mode"
 import { readWhatsAppWorkerStatus } from "@/lib/whatsapp-worker-status"
 
 export const runtime = "nodejs"
@@ -98,6 +99,11 @@ export async function POST(request: Request) {
   }
 
   try {
+    const deliveryMode = await readWhatsAppDeliveryMode()
+    if (deliveryMode === "cloud") {
+      return NextResponse.json({ error: "وضع الإرسال الحالي سحابي. شغّل عامل VPS بدل التشغيل المحلي." }, { status: 409 })
+    }
+
     if (process.env.VERCEL) {
       return NextResponse.json({ error: "التشغيل التلقائي للعامل المحلي غير متاح على Vercel" }, { status: 409 })
     }

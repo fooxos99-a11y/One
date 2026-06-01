@@ -103,8 +103,7 @@ export default function PathwaysPage() {
         throw new Error(payload?.error || "تعذر تحميل مستويات المسار")
       }
 
-      return (payload?.levels || []) as PathwayLevelRow[]
-    }
+      return (payload?.levels || []) as PathwayLevelRow[]    }
 
     async function loadPathwayData() {
       const currentUserStr = localStorage.getItem("currentUser")

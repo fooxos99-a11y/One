@@ -268,7 +268,6 @@ export function GoalsSection() {
             </div>
           </div>
         </div>
-      ) : null}
-    </section>
+      ) : null}    </section>
   )
 }

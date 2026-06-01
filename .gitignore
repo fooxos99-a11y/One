@@ -40,40 +40,4 @@ yarn-error.log*
 # local env files
 .env*.local
 .env.local-worker
-.env
-.env*.txt
-.env_dump.txt
-my_env.txt
-deploy/vps/sites/*/site.env
-deploy/vercel/*.env
-
-# whatsapp worker session
-whatsapp-worker/.wwebjs_auth/
-/.wwebjs_cache/
-whatsapp-worker/.wwebjs_cache/
-whatsapp-worker/status.json
-whatsapp-worker/site-4/.wwebjs_auth/
-whatsapp-worker/site-4/whatsapp-status.json
-whatsapp-worker/site-4/whatsapp-qr.png
-whatsapp-worker/site-4/whatsapp-command.json
-whatsapp-worker/site-4/whatsapp-worker.lock
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# pnpm
-.pnpm-debug.log*
-.pnpm-store/
-
-# local whatsapp worker runtime
-whatsapp-worker/.wwebjs_auth_local/
-whatsapp-worker/current-qr-local.png
-whatsapp-worker/status-local.json
-whatsapp-worker/worker-local.lock
-whatsapp-worker/whatsapp-worker/
-
 .vercel

@@ -23,6 +23,7 @@ export function TeacherAttendanceCheck({
   const [localAccountNumber, setLocalAccountNumber] = useState(accountNumber)
 
   useEffect(() => {
+    // Get data from props
     setLocalTeacherId(teacherId)
     setLocalTeacherName(teacherName)
     setLocalAccountNumber(accountNumber)
@@ -41,14 +42,12 @@ export function TeacherAttendanceCheck({
 
           setShowModal(!data.exists)
         } catch (error) {
-          console.error("[v0] Error checking daily attendance:", error)
-        }
+          console.error("[v0] Error checking daily attendance:", error)        }
       }
     }
 
     void checkDailyAttendance()
   }, [accountNumber, teacherId, teacherName, triggerFromLogin])
-
   if (!localTeacherId) {
     return null
   }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase-client"
 import { Bell, BellRing, CheckCircle2, Clock, Smartphone, Trash2 } from "lucide-react"
 import { SiteLoader } from "@/components/ui/site-loader"
 import {
@@ -101,8 +102,7 @@ export default function NotificationsClient() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: unreadIds, markRead: true }),
-        })
-      }
+        })      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -115,7 +115,6 @@ export default function NotificationsClient() {
       const response = await fetch(`/api/notifications?id=${encodeURIComponent(id)}`, { method: "DELETE" })
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(data?.error || "تعذر حذف الإشعار")
-
       setNotifications((prev) => prev.filter((notification) => notification.id !== id))
     } catch (error) {
       console.error(error)

@@ -13,8 +13,7 @@ export function VisionSection() {
             <h2 className="mb-5 text-3xl font-black leading-tight text-[#1a2332] sm:text-4xl md:text-5xl">
               صناعة جيل قرآني متميز علمًا وسلوكًا
             </h2>
-            <p className="text-base leading-8 text-[#4d586c] sm:text-lg sm:leading-9 md:text-xl">
-              أن يكون المجمع بيئةً مثالية في تعليم كتاب الله تعالى، وتربية الطلاب على العلم والعمل والخلق، بما يسهم في
+            <p className="text-base leading-8 text-[#4d586c] sm:text-lg sm:leading-9 md:text-xl">              أن يكون المجمع بيئةً مثالية في تعليم كتاب الله تعالى، وتربية الطلاب على العلم والعمل والخلق، بما يسهم في
               صناعة جيل قرآني متميز علمًا وسلوكًا وعطاءً.
             </p>
           </div>

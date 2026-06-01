@@ -6,53 +6,46 @@ import { ChevronLeft, Gamepad2, Grid3x3, Loader2, Puzzle, Trophy } from "lucide-
 
 import { Footer } from "@/components/footer"
 import { Header } from "@/components/header"
-
 const games = [
   {
     id: "categories",
     title: "لعبة الفئات",
-    description: "مواجهة سريعة بين فريقين عبر فئات متنوعة وأسئلة متدرجة.",
-    icon: Grid3x3,
+    description: "مواجهة سريعة بين فريقين عبر فئات متنوعة وأسئلة متدرجة.",    icon: Grid3x3,
     available: true,
     path: "/competitions/categories",
   },
   {
     id: "auction",
     title: "لعبة المزاد",
-    description: "تحدي قائم على النقاط والأسئلة العشوائية مع قرارات أسرع أثناء اللعب.",
-    icon: Gamepad2,
+    description: "تحدي قائم على النقاط والأسئلة العشوائية مع قرارات أسرع أثناء اللعب.",    icon: Gamepad2,
     available: true,
     path: "/competitions/auction",
   },
   {
     id: "guess-images",
     title: "خمن الصورة",
-    description: "اكتشف معنى الصورة قبل الفريق الآخر واحصد التقدم في الجولة.",
-    icon: Puzzle,
+    description: "اكتشف معنى الصورة قبل الفريق الآخر واحصد التقدم في الجولة.",    icon: Puzzle,
     available: true,
     path: "/competitions/guess-images",
   },
   {
     id: "letter-hive",
     title: "خلية الحروف",
-    description: "سباق تعاوني تنافسي لتوصيل اللون من الجهتين والفوز بالمسار.",
-    icon: Grid3x3,
+    description: "سباق تعاوني تنافسي لتوصيل اللون من الجهتين والفوز بالمسار.",    icon: Grid3x3,
     available: true,
     path: "/competitions/letter-hive/teams",
   },
   {
     id: "millionaire-game",
     title: "من سيربح المليون",
-    description: "أسئلة متدرجة الصعوبة في تجربة جماعية مستوحاة من نمط المسابقات الكبرى.",
-    icon: Trophy,
+    description: "أسئلة متدرجة الصعوبة في تجربة جماعية مستوحاة من نمط المسابقات الكبرى.",    icon: Trophy,
     available: true,
     path: "/competitions/millionaire-game",
   },
   {
     id: "higher-lower",
     title: "أعلى أو أقل",
-    description: "تحدي تخمين سريع يعتمد على المقارنة واتخاذ القرار في الوقت المناسب.",
-    icon: Puzzle,
+    description: "تحدي تخمين سريع يعتمد على المقارنة واتخاذ القرار في الوقت المناسب.",    icon: Puzzle,
     available: false,
     path: "/competitions/higher-lower",
   },
@@ -134,8 +127,7 @@ export default function CompetitionsPage() {
                 </div>
               </button>
             ))}
-          </section>
-        </div>
+          </section>        </div>
       </main>
 
       <Footer />
