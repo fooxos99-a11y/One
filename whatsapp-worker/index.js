@@ -22,6 +22,85 @@ function resolveWorkerPath(configuredPath, fallbackPath) {
 
   return path.isAbsolute(candidate) ? candidate : path.resolve(PROJECT_ROOT, candidate)
 }
+
+function sanitizeInstanceSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function getSupabaseProjectRef(url) {
+  try {
+    const hostname = new URL(String(url || "")).hostname
+    return hostname.split(".")[0] || null
+  } catch {
+    return null
+  }
+}
+
+function getDefaultInstanceSlug() {
+  const explicitSlug = sanitizeInstanceSlug(process.env.WHATSAPP_INSTANCE_SLUG)
+  if (explicitSlug) {
+    return explicitSlug
+  }
+
+  const configuredClientId = sanitizeInstanceSlug(process.env.WHATSAPP_CLIENT_ID)
+  if (configuredClientId) {
+    return configuredClientId
+  }
+
+  const projectRef = sanitizeInstanceSlug(
+    process.env.SUPABASE_PROJECT_REF || getSupabaseProjectRef(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
+  )
+  if (projectRef) {
+    return projectRef
+  }
+
+  const portToken = sanitizeInstanceSlug(process.env.PORT)
+  if (portToken) {
+    return `port-${portToken}`
+  }
+
+  return "default"
+}
+
+function getWorkerMode() {
+  const normalizedMode = String(process.env.WHATSAPP_WORKER_MODE || "").trim().toLowerCase()
+  if (["local", "device", "desktop"].includes(normalizedMode)) {
+    return "local"
+  }
+
+  return "vps"
+}
+
+function getDefaultDeviceLabel(workerMode) {
+  const explicitLabel = String(process.env.WHATSAPP_DEVICE_LABEL || "").trim()
+  if (explicitLabel) {
+    return explicitLabel
+  }
+
+  if (workerMode === "local") {
+    return "الجهاز الحالي"
+  }
+
+  return "العامل السحابي"
+}
+
+const INSTANCE_SLUG = getDefaultInstanceSlug()
+const WORKER_MODE = getWorkerMode()
+const DEVICE_LABEL = getDefaultDeviceLabel(WORKER_MODE)
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY
+const QUEUE_TABLE = process.env.WHATSAPP_QUEUE_TABLE || "whatsapp_queue"
+const HISTORY_TABLE = process.env.WHATSAPP_HISTORY_TABLE || "whatsapp_messages"
+const REPLIES_TABLE = process.env.WHATSAPP_REPLIES_TABLE || "whatsapp_replies"
+const AUTH_DIR = resolveWorkerPath(process.env.WHATSAPP_AUTH_DIR, path.join(__dirname, `.wwebjs_auth_${INSTANCE_SLUG}`))
+const QR_IMAGE_PATH = resolveWorkerPath(process.env.WHATSAPP_QR_IMAGE_PATH, path.join(__dirname, `current-qr-${INSTANCE_SLUG}.png`))
+const STATUS_FILE_PATH = resolveWorkerPath(process.env.WHATSAPP_STATUS_FILE_PATH, path.join(__dirname, `status-${INSTANCE_SLUG}.json`))
+const COMMAND_FILE_PATH = resolveWorkerPath(process.env.WHATSAPP_COMMAND_FILE_PATH, path.join(__dirname, `command-${INSTANCE_SLUG}.json`))
+const LOCK_FILE_PATH = resolveWorkerPath(process.env.WHATSAPP_LOCK_FILE_PATH, path.join(__dirname, `worker-${INSTANCE_SLUG}.lock`))
 const CLIENT_ID = process.env.WHATSAPP_CLIENT_ID || `qabas-whatsapp-worker-${INSTANCE_SLUG}`
 const WORKER_STATE_SETTING_ID = process.env.WHATSAPP_WORKER_STATE_SETTING_ID || "whatsapp_worker_state"
 const WORKER_COMMAND_SETTING_ID = process.env.WHATSAPP_WORKER_COMMAND_SETTING_ID || "whatsapp_worker_command"
@@ -91,6 +170,21 @@ function resolveBrowserExecutablePath() {
 
 const BROWSER_EXECUTABLE_PATH = resolveBrowserExecutablePath()
 
+function log(message, extra) {
+  const timestamp = new Date().toISOString()
+
+  if (extra === undefined) {
+    console.log(`[${timestamp}] ${message}`)
+    return
+  }
+
+  console.log(`[${timestamp}] ${message}`, extra)
+}
+
+if (BROWSER_EXECUTABLE_PATH) {
+  log(`Using browser executable: ${BROWSER_EXECUTABLE_PATH}`)
+}
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error(
     "Missing Supabase credentials. Expected SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY."
@@ -153,7 +247,78 @@ let startupWatchdog = null
 let workerState = {
   instanceSlug: INSTANCE_SLUG,
   workerMode: WORKER_MODE,
-  deviceLabel: DEVICE_LABEL,    return null
+  deviceLabel: DEVICE_LABEL,
+  status: "starting",
+  qrAvailable: false,
+  ready: false,
+  authenticated: false,
+  pid: process.pid,
+  startedAt: new Date().toISOString(),
+  lastUpdatedAt: null,
+  lastHeartbeatAt: null,
+  qrUpdatedAt: null,
+  connectedAt: null,
+  disconnectedAt: null,
+  authFailedAt: null,
+  lastError: null,
+  lastResetReason: null,
+  qrValue: null,
+}
+
+const whatsappClient = new Client({
+  authStrategy: new LocalAuth({
+    clientId: CLIENT_ID,
+    dataPath: AUTH_DIR,
+  }),
+  puppeteer: {
+    headless: true,
+    executablePath: BROWSER_EXECUTABLE_PATH,
+    args: PUPPETEER_ARGS,
+  },
+})
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function randomDelay() {
+  const span = MAX_DELAY_MS - MIN_DELAY_MS
+  return MIN_DELAY_MS + Math.floor(Math.random() * (span + 1))
+}
+
+function randomBurstPause() {
+  const span = BURST_PAUSE_MAX_MS - BURST_PAUSE_MIN_MS
+  return BURST_PAUSE_MIN_MS + Math.floor(Math.random() * (span + 1))
+}
+
+function normalizePhoneNumber(phoneNumber) {
+  if (!phoneNumber) {
+    throw new Error("Missing phone_number value.")
+  }
+
+  let normalized = String(phoneNumber).trim().replace(/[^\d]/g, "")
+
+  if (normalized.startsWith("00")) {
+    normalized = normalized.slice(2)
+  }
+
+  if (/^05\d{8}$/.test(normalized)) {
+    normalized = `966${normalized.slice(1)}`
+  } else if (/^5\d{8}$/.test(normalized)) {
+    normalized = `966${normalized}`
+  }
+
+  if (!/^\d{8,15}$/.test(normalized)) {
+    throw new Error(`Invalid phone_number format: ${phoneNumber}`)
+  }
+
+  return normalized
+}
+
+function buildOutgoingMedia(row) {
+  const messageType = String(row?.message_type || "text").trim().toLowerCase()
+  if (messageType !== "image" && messageType !== "document") {
+    return null
   }
 
   const mimeType = String(row?.media_mime_type || "").trim().toLowerCase()
@@ -167,7 +332,8 @@ let workerState = {
   return {
     media: new MessageMedia(mimeType, mediaBase64, fileName),
     options: messageType === "document" ? { sendMediaAsDocument: true } : undefined,
-  }}
+  }
+}
 
 function extractWhatsAppMessageId(message) {
   return message?.id?._serialized || message?.id?.id || null
@@ -509,6 +675,13 @@ function ensureLockDirectory() {
   }
 }
 
+function ensureCommandDirectory() {
+  const directoryPath = path.dirname(COMMAND_FILE_PATH)
+  if (!fs.existsSync(directoryPath)) {
+    fs.mkdirSync(directoryPath, { recursive: true })
+  }
+}
+
 function isProcessAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) {
     return false
@@ -590,13 +763,219 @@ function currentWorkerOwnsLock() {
     return false
   }
 }
+
+function clearStartupWatchdog() {
+  if (startupWatchdog) {
+    clearTimeout(startupWatchdog)
+    startupWatchdog = null
+  }
+}
+
+function requestProcessRestart(reason, exitCode = 0) {
+  clearStartupWatchdog()
+
+  if (IS_PM2_MANAGED) {
+    log(`Restarting WhatsApp worker through PM2 supervisor. Reason: ${reason}`)
+  } else {
+    const detachedWorker = spawn(process.execPath, [__filename], {
+      cwd: __dirname,
+      env: process.env,
+      detached: true,
+      stdio: "ignore",
+    })
+
+    detachedWorker.unref()
+  }
+
+  process.exit(exitCode)
+}
+
+function scheduleStartupWatchdog() {
+  clearStartupWatchdog()
+
+  startupWatchdog = setTimeout(() => {
+    if (isResettingSession || workerState.ready || workerState.authenticated || workerState.qrAvailable || workerState.qrValue) {
+      return
+    }
+
+    log(`WhatsApp worker startup watchdog expired after ${STARTUP_TIMEOUT_MS}ms.`)
+    persistWorkerState({
+      status: "startup_failed",
+      ready: false,
+      authenticated: false,
+      qrAvailable: false,
+      qrValue: null,
+      authFailedAt: new Date().toISOString(),
+      lastError: `Startup timed out after ${STARTUP_TIMEOUT_MS}ms.`,
+      lastResetReason: "startup_timeout",
+    })
+    releaseWorkerLock()
+    requestProcessRestart("startup timeout", 1)
+  }, STARTUP_TIMEOUT_MS)
+
+  startupWatchdog.unref()
+}
+
+async function persistWorkerStateToSupabase() {
+  if (isPersistingSharedState) {
+    return
+  }
+
+  isPersistingSharedState = true
+
+  try {
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ id: WORKER_STATE_SETTING_ID, value: workerState }, { onConflict: "id" })
+
+    if (error) {
+      log("Failed to persist WhatsApp worker state to Supabase.", error)
+    }
+  } catch (error) {
+    log("Failed to sync WhatsApp worker state to Supabase.", error)
+  } finally {
+    isPersistingSharedState = false
+  }
+}
+
+function persistWorkerState(partialState = {}) {
+  if (!currentWorkerOwnsLock()) {
+    hasWorkerLock = false
+    log("Current WhatsApp worker lost lock ownership. Exiting stale process.")
+    process.exit(0)
+    return
+  }
+
   const now = new Date().toISOString()
   workerState = {
     ...workerState,
     ...partialState,
     instanceSlug: partialState.instanceSlug || workerState.instanceSlug || INSTANCE_SLUG,
     workerMode: partialState.workerMode || workerState.workerMode || WORKER_MODE,
-    deviceLabel: partialState.deviceLabel || workerState.deviceLabel || DEVICE_LABEL,      persistWorkerState({
+    deviceLabel: partialState.deviceLabel || workerState.deviceLabel || DEVICE_LABEL,
+    pid: process.pid,
+    startedAt: workerState.startedAt || now,
+    lastUpdatedAt: now,
+    lastHeartbeatAt: partialState.lastHeartbeatAt || now,
+  }
+
+  try {
+    ensureStatusDirectory()
+    fs.writeFileSync(STATUS_FILE_PATH, JSON.stringify(workerState, null, 2), "utf8")
+  } catch (error) {
+    log("Failed to persist WhatsApp worker state.", error)
+  }
+
+  void persistWorkerStateToSupabase()
+}
+
+function isClientConnectedState(clientState) {
+  return String(clientState || "").trim().toUpperCase() === "CONNECTED"
+}
+
+function isClientUnpairedState(clientState) {
+  const normalizedState = String(clientState || "").trim().toUpperCase()
+  return normalizedState === "UNPAIRED" || normalizedState === "UNPAIRED_IDLE"
+}
+
+function hasRecentQrState() {
+  if (!workerState.qrUpdatedAt || workerState.authenticated) {
+    return false
+  }
+
+  const qrUpdatedAtTime = new Date(workerState.qrUpdatedAt).getTime()
+  if (!Number.isFinite(qrUpdatedAtTime)) {
+    return false
+  }
+
+  return Date.now() - qrUpdatedAtTime <= 5 * 60 * 1000
+}
+
+function hasPendingQrSession() {
+  return Boolean((fs.existsSync(QR_IMAGE_PATH) || workerState.qrValue || hasRecentQrState()) && !workerState.authenticated)
+}
+
+function shouldForceFreshQrFromState(clientState) {
+  const normalizedState = String(clientState || "").trim().toUpperCase()
+  return normalizedState === "UNKNOWN"
+}
+
+function shouldForceFreshQrFromReason(reason) {
+  const normalizedReason = String(reason || "").trim().toUpperCase()
+  return normalizedReason.includes("UNKNOWN")
+}
+
+function hasStartupGraceExpired(graceMs = 60000) {
+  const startedAtTime = workerState.startedAt ? new Date(workerState.startedAt).getTime() : 0
+  if (!Number.isFinite(startedAtTime) || !startedAtTime) {
+    return true
+  }
+
+  return Date.now() - startedAtTime > graceMs
+}
+
+function isRecoverableConnectionError(error) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Attempted to use detached Frame|Execution context was destroyed|Cannot find context with specified id|Target closed/i.test(message)
+}
+
+async function verifyWhatsAppConnection() {
+  if (isResettingSession || typeof whatsappClient.getState !== "function") {
+    return
+  }
+
+  try {
+    const clientState = await whatsappClient.getState()
+    consecutiveConnectionCheckFailures = 0
+    const normalizedState = String(clientState || "unknown").trim().toUpperCase()
+
+    if (isClientConnectedState(normalizedState)) {
+      if (!isWhatsappReady || workerState.status !== "connected" || !workerState.ready || !workerState.authenticated) {
+        isWhatsappReady = true
+        removeQrImage()
+        persistWorkerState({
+          status: "connected",
+          qrAvailable: false,
+          ready: true,
+          authenticated: true,
+          qrValue: null,
+          connectedAt: workerState.connectedAt || new Date().toISOString(),
+          lastError: null,
+        })
+      } else {
+        persistWorkerState({ lastHeartbeatAt: new Date().toISOString() })
+      }
+      return
+    }
+
+    isWhatsappReady = false
+
+    if (hasPendingQrSession() && (normalizedState === "UNKNOWN" || normalizedState === "DISCONNECTED")) {
+      persistWorkerState({
+        status: "waiting_for_qr",
+        qrAvailable: true,
+        ready: false,
+        authenticated: false,
+        qrValue: workerState.qrValue,
+        lastError: null,
+      })
+      return
+    }
+
+    if (isClientUnpairedState(normalizedState)) {
+      if (hasPendingQrSession() || !hasStartupGraceExpired()) {
+        persistWorkerState({
+          status: "waiting_for_qr",
+          qrAvailable: true,
+          ready: false,
+          authenticated: false,
+          qrValue: workerState.qrValue,
+          lastError: null,
+        })
+        return
+      }
+
+      persistWorkerState({
         status: "disconnected",
         qrAvailable: false,
         ready: false,
@@ -631,7 +1010,7 @@ function currentWorkerOwnsLock() {
       normalizedState === "UNKNOWN" &&
       !workerState.authenticated &&
       !hasPendingQrSession() &&
-      !hasStartupGraceExpired()
+      !hasStartupGraceExpired(),
     )
 
     if (shouldWaitForInitialQr) {
@@ -844,6 +1223,23 @@ function compareQueuedRows(firstRow, secondRow) {
 
   return String(firstRow?.id || "").localeCompare(String(secondRow?.id || ""))
 }
+
+function enqueueMessage(row) {
+  if (!row || !row.id) {
+    return
+  }
+
+  if (row.status && row.status !== "pending") {
+    return
+  }
+
+  if (seenMessageIds.has(row.id)) {
+    return
+  }
+
+  seenMessageIds.add(row.id)
+  queue.push(row)
+  queue.sort(compareQueuedRows)
   log(`Queued message ${row.id} for ${row.phone_number}. Queue size: ${queue.length}`)
   void processQueue()
 }
@@ -892,6 +1288,27 @@ async function claimPendingMessage(id) {
 
   return true
 }
+
+async function processQueue() {
+  if (isProcessingQueue || !isWhatsappReady) {
+    return
+  }
+
+  isProcessingQueue = true
+
+  while (queue.length > 0 && isWhatsappReady) {
+    const row = queue.shift()
+
+    if (!row) {
+      continue
+    }
+
+    const claimed = await claimPendingMessage(row.id)
+    if (!claimed) {
+      seenMessageIds.delete(row.id)
+      continue
+    }
+
     try {
       const normalizedPhone = normalizePhoneNumber(row.phone_number)
       const phoneInfo = await whatsappClient.getNumberId(normalizedPhone)
@@ -920,6 +1337,7 @@ async function claimPendingMessage(id) {
       if (outgoingMedia && messageType === "document" && trimmedMessage) {
         await whatsappClient.sendMessage(chatId, trimmedMessage)
       }
+
       await updateSentMessageMetadata(row.id, extractWhatsAppMessageId(sentMessage))
       await updateQueueStatus(row.id, "sent")
       sentMessagesSincePause += 1
