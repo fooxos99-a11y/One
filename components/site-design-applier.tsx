@@ -7,6 +7,9 @@ type SiteDesignResponse = {
   settings?: SiteDesignSettings
 }
 
+const SITE_DESIGN_CACHE_KEY = "site-design-settings"
+const SITE_DESIGN_CACHE_MAX_AGE_MS = 15 * 60 * 1000
+
 function applySiteDesign(settings: SiteDesignSettings) {
   const root = document.documentElement
   const cssVariables = buildSiteDesignCssVariables(settings)
@@ -16,19 +19,40 @@ function applySiteDesign(settings: SiteDesignSettings) {
   }
 }
 
+function readCachedSiteDesign() {
+  try {
+    const rawSettings = localStorage.getItem(SITE_DESIGN_CACHE_KEY)
+    const rawTimestamp = localStorage.getItem(`${SITE_DESIGN_CACHE_KEY}:ts`)
+    if (!rawSettings || !rawTimestamp) return null
+    if (Date.now() - Number(rawTimestamp) > SITE_DESIGN_CACHE_MAX_AGE_MS) return null
+    const parsed = JSON.parse(rawSettings) as SiteDesignSettings
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCachedSiteDesign(settings: SiteDesignSettings) {
+  try {
+    localStorage.setItem(SITE_DESIGN_CACHE_KEY, JSON.stringify(settings))
+    localStorage.setItem(`${SITE_DESIGN_CACHE_KEY}:ts`, Date.now().toString())
+  } catch {}
+}
+
 export function SiteDesignApplier() {
   useEffect(() => {
     let disposed = false
 
     const applyLatestSiteDesign = async () => {
       try {
-        const response = await fetch(`/api/site-design?t=${Date.now()}`, { cache: "no-store" })
+        const response = await fetch("/api/site-design", { cache: "force-cache" })
         const data = (await response.json().catch(() => null)) as SiteDesignResponse | null
 
         if (!response.ok || !data?.settings || disposed) {
           throw new Error("Failed to load site design")
         }
 
+        writeCachedSiteDesign(data.settings)
         applySiteDesign(data.settings)
       } catch {
         if (!disposed) {
@@ -39,6 +63,11 @@ export function SiteDesignApplier() {
 
     const handleSiteDesignUpdate = () => {
       void applyLatestSiteDesign()
+    }
+
+    const cachedSettings = readCachedSiteDesign()
+    if (cachedSettings) {
+      applySiteDesign(cachedSettings)
     }
 
     void applyLatestSiteDesign()

@@ -1,4 +1,4 @@
-"use client"
+import Image from "next/image"
 
 export function HeroSection() {
   return (
@@ -32,12 +32,11 @@ export function HeroSection() {
       <div className="container relative z-10 mx-auto py-32 lg:py-0">
         <div className="mx-auto max-w-5xl text-center text-white">
           <div className="mx-auto mb-6 flex items-center justify-center">
-            <img
+            <Image
               src="/%D8%B4%D8%B9%D8%A7%D8%B1-%D8%A7%D9%84%D8%AC%D9%85%D8%B9%D9%8A%D8%A9.png"
               alt="شعار الجمعية"
-              width="118"
-              height="112"
-              decoding="async"
+              width={118}
+              height={112}
               fetchPriority="high"
               className="landing-logo-top h-24 w-auto object-contain sm:h-28 md:h-32"
             />

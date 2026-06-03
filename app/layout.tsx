@@ -4,11 +4,8 @@ import { Cairo } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog"
-import { NotificationPermissionPrompt } from "@/components/notification-permission-prompt"
-import { NativeNotificationBridge } from "@/components/native-notification-bridge"
-import { PwaRegistration } from "@/components/pwa-registration"
+import { DeferredGlobalEnhancements } from "@/components/deferred-global-enhancements"
 import { SiteDesignApplier } from "@/components/site-design-applier"
-import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 const cairo = Cairo({
@@ -45,11 +42,8 @@ export default function RootLayout({
       <head />
       <body className="antialiased" suppressHydrationWarning>
         <SiteDesignApplier />
-        <PwaRegistration />
-        <NativeNotificationBridge />
-        <NotificationPermissionPrompt />
         <ConfirmDialogProvider>{children}</ConfirmDialogProvider>
-        <Toaster />
+        <DeferredGlobalEnhancements />
         <Analytics />
         <SpeedInsights />
       </body>
