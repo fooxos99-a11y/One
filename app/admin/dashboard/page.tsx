@@ -477,6 +477,7 @@ export default function AdminDashboardPage() {
   })
   const [studentDailyInlineActions, setStudentDailyInlineActions] = useState({
     openTemplates: () => {},
+    openAutoSend: () => {},
   })
   const [examInlineActions, setExamInlineActions] = useState({
     openSchedulesOverview: () => {},
@@ -1025,6 +1026,7 @@ export default function AdminDashboardPage() {
     if (activeInlinePage !== "student-daily-attendance") {
       setStudentDailyInlineActions({
         openTemplates: () => {},
+        openAutoSend: () => {},
       })
     }
   }, [activeInlinePage])
@@ -1095,7 +1097,7 @@ export default function AdminDashboardPage() {
                   const isExpanded = expandedSectionKeys.includes(section.key)
 
                   return (
-                    <div key={section.key} className={index >= 4 ? "border-t border-[var(--border)] pt-3" : undefined}>
+                    <div key={section.key} className={index >= 4 ? "pt-3" : undefined}>
                       <button
                         type="button"
                         onClick={() => toggleSection(section.key)}
@@ -1110,7 +1112,7 @@ export default function AdminDashboardPage() {
 
                       <div className={`grid transition-all duration-300 ease-out ${isExpanded ? "mt-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
                         <div className="overflow-hidden">
-                          <div className="space-y-1.5 rounded-2xl border border-[#edf1f7] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+                          <div className="space-y-1.5 rounded-2xl bg-transparent p-2">
                           {section.items.map((item) => {
                             const ItemIcon = item.icon
                             const isSelected = activeAction?.key === item.key
@@ -1126,7 +1128,7 @@ export default function AdminDashboardPage() {
                                 }}
                                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                                   isSelected
-                                    ? "border border-[#cfe0ff] bg-[#edf4ff] text-[#24428f]"
+                                    ? "bg-[#edf4ff] text-[#24428f]"
                                     : "text-[#36506f] hover:bg-[#f8fbff]"
                                 }`}
                               >
@@ -1363,13 +1365,22 @@ export default function AdminDashboardPage() {
                     </div>
                   ) : null}
                   {activeInlinePage === "student-daily-attendance" ? (
-                    <button
-                      type="button"
-                      onClick={() => studentDailyInlineActions.openTemplates()}
-                      className={dashboardOutlineButtonClass}
-                    >
-                      القوالب
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => studentDailyInlineActions.openAutoSend()}
+                        className={dashboardSolidButtonClass}
+                      >
+                        الإرسال التلقائي
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => studentDailyInlineActions.openTemplates()}
+                        className={dashboardOutlineButtonClass}
+                      >
+                        القوالب
+                      </button>
+                    </>
                   ) : null}
                   {activeInlinePage === "exams" ? (
                     <>

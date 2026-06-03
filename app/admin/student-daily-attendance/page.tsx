@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertCircle, Calendar, Settings2 } from "lucide-react"
+import { AlertCircle, Calendar, Send, Settings2 } from "lucide-react"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { useAlertDialog } from "@/hooks/use-confirm-dialog"
 import { SiteLoader } from "@/components/ui/site-loader"
@@ -147,7 +147,7 @@ export function StudentDailyAttendanceContent({
   onInlineActionsChange,
 }: {
   displayMode?: "page" | "inline"
-  onInlineActionsChange?: (actions: { openTemplates: () => void }) => void
+  onInlineActionsChange?: (actions: { openTemplates: () => void; openAutoSend: () => void }) => void
 }) {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("السجل اليومي للطلاب");
   const showAlert = useAlertDialog()
@@ -159,8 +159,10 @@ export function StudentDailyAttendanceContent({
   const [circles, setCircles] = useState<CircleOption[]>([])
   const [selectedCircle, setSelectedCircle] = useState("all")
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
+  const [isAutoSendDialogOpen, setIsAutoSendDialogOpen] = useState(false)
   const [isWeeklyScheduleDialogOpen, setIsWeeklyScheduleDialogOpen] = useState(false)
   const [isSavingTemplates, setIsSavingTemplates] = useState(false)
+  const [isSavingAutoSend, setIsSavingAutoSend] = useState(false)
   const [attendanceTemplatesForm, setAttendanceTemplatesForm] = useState<AttendanceSaveNotificationTemplates>(
     DEFAULT_ATTENDANCE_SAVE_NOTIFICATION_TEMPLATES,
   )
@@ -208,6 +210,7 @@ export function StudentDailyAttendanceContent({
 
     onInlineActionsChange({
       openTemplates: () => setIsTemplatesDialogOpen(true),
+      openAutoSend: () => setIsAutoSendDialogOpen(true),
     })
   }, [onInlineActionsChange])
 
@@ -270,6 +273,19 @@ export function StudentDailyAttendanceContent({
         throw new Error(templatesData.error || "تعذر حفظ القوالب")
       }
 
+      setAttendanceTemplatesForm(normalizeAttendanceSaveNotificationTemplates(attendanceTemplatesForm))
+      setIsTemplatesDialogOpen(false)
+      await showAlert("تم حفظ قوالب الرسائل", "نجاح")
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : "تعذر حفظ القوالب", "خطأ")
+    } finally {
+      setIsSavingTemplates(false)
+    }
+  }
+
+  const saveAttendanceAutoSendSettings = async () => {
+    try {
+      setIsSavingAutoSend(true)
       const settingsResponse = await fetch("/api/site-settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -284,14 +300,13 @@ export function StudentDailyAttendanceContent({
         throw new Error(settingsData.error || "تعذر حفظ إعدادات الإرسال التلقائي")
       }
 
-      setAttendanceTemplatesForm(normalizeAttendanceSaveNotificationTemplates(attendanceTemplatesForm))
       setAttendanceAutoSendForm(normalizeAttendanceAutoSendSettings(attendanceAutoSendForm))
-      setIsTemplatesDialogOpen(false)
-      await showAlert("تم حفظ قوالب الرسائل وإعدادات الإرسال التلقائي", "نجاح")
+      setIsAutoSendDialogOpen(false)
+      await showAlert("تم حفظ إعدادات الإرسال التلقائي", "نجاح")
     } catch (error) {
-      await showAlert(error instanceof Error ? error.message : "تعذر حفظ القوالب", "خطأ")
+      await showAlert(error instanceof Error ? error.message : "تعذر حفظ إعدادات الإرسال التلقائي", "خطأ")
     } finally {
-      setIsSavingTemplates(false)
+      setIsSavingAutoSend(false)
     }
   }
 
@@ -386,7 +401,14 @@ export function StudentDailyAttendanceContent({
             className="h-11 rounded-full border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] hover:bg-[#f6f9ff]"
           >
             <Settings2 className="me-2 h-4 w-4" />
-            القوالب والإرسال التلقائي
+            القوالب
+          </Button>
+          <Button
+            onClick={() => setIsAutoSendDialogOpen(true)}
+            className="h-11 rounded-full border border-[#d8e5fb] bg-[#3453a7] px-5 text-sm font-bold text-white hover:bg-[#28448e]"
+          >
+            <Send className="me-2 h-4 w-4" />
+            الإرسال التلقائي
           </Button>
         </div>
       ) : null}
@@ -503,7 +525,7 @@ export function StudentDailyAttendanceContent({
     <Dialog open={isTemplatesDialogOpen} onOpenChange={setIsTemplatesDialogOpen}>
       <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto" dir="rtl">
         <DialogHeader className="flex flex-row items-center justify-between gap-3 text-right">
-          <DialogTitle className="text-right text-xl font-black text-[#1a2332]">قوالب رسائل ولي الأمر والإرسال التلقائي</DialogTitle>
+          <DialogTitle className="text-right text-xl font-black text-[#1a2332]">قوالب رسائل ولي الأمر</DialogTitle>
           <div className="group relative shrink-0 self-start">
             <button
               type="button"
@@ -529,24 +551,6 @@ export function StudentDailyAttendanceContent({
           </div>
         </DialogHeader>
         <div className="space-y-4 pt-2 text-right">
-          <div className="rounded-[26px] border border-[#d8e4fb] bg-[#f8fbff] p-4 sm:p-5">
-            <div className="space-y-3">
-              <div className="text-base font-black text-[#1a2332]">الإرسال التلقائي</div>
-              <div className="max-w-[220px] space-y-2">
-                <div className="text-sm font-bold text-[#1a2332]">نوع الإرسال</div>
-                <Select value={attendanceAutoSendForm.mode} onValueChange={handleAutoSendModeChange}>
-                  <SelectTrigger className="border-[#d8e4fb] bg-white text-base focus:ring-[#3453a7]/30">
-                    <SelectValue placeholder="اختر نوع الإرسال" />
-                  </SelectTrigger>
-                  <SelectContent dir="rtl">
-                    <SelectItem value="daily">يومي</SelectItem>
-                    <SelectItem value="weekly">أسبوعي</SelectItem>
-                    <SelectItem value="none">إيقاف</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
               <div className="text-sm font-bold text-[#1a2332]">رسالة الحاضر</div>
@@ -575,6 +579,39 @@ export function StudentDailyAttendanceContent({
             </Button>
             <Button onClick={saveAttendanceTemplates} disabled={isSavingTemplates} className="h-11 rounded-full border border-[#d8e4fb] bg-[#3453a7] px-6 text-white hover:bg-[#28448e] disabled:border-[#d8e4fb] disabled:bg-white disabled:text-white disabled:opacity-100">
               {isSavingTemplates ? "جاري الحفظ..." : "حفظ القوالب"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+
+  const autoSendDialog = (
+    <Dialog open={isAutoSendDialogOpen} onOpenChange={setIsAutoSendDialogOpen}>
+      <DialogContent className="max-w-md" dir="rtl">
+        <DialogHeader className="text-right">
+          <DialogTitle className="text-right text-xl font-black text-[#1a2332]">الإرسال التلقائي</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2 text-right">
+          <div className="space-y-2">
+            <div className="text-sm font-bold text-[#1a2332]">نوع الإرسال</div>
+            <Select value={attendanceAutoSendForm.mode} onValueChange={handleAutoSendModeChange}>
+              <SelectTrigger className="border-[#d8e4fb] bg-white text-base focus:ring-[#3453a7]/30">
+                <SelectValue placeholder="اختر نوع الإرسال" />
+              </SelectTrigger>
+              <SelectContent dir="rtl">
+                <SelectItem value="daily">يومي</SelectItem>
+                <SelectItem value="weekly">أسبوعي</SelectItem>
+                <SelectItem value="none">إيقاف</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-start gap-2">
+            <Button variant="outline" onClick={() => setIsAutoSendDialogOpen(false)} className="h-11 rounded-full border-[#d8e4fb] px-6">
+              إغلاق
+            </Button>
+            <Button onClick={saveAttendanceAutoSendSettings} disabled={isSavingAutoSend} className="h-11 rounded-full border border-[#d8e4fb] bg-[#3453a7] px-6 text-white hover:bg-[#28448e] disabled:border-[#d8e4fb] disabled:bg-white disabled:text-white disabled:opacity-100">
+              {isSavingAutoSend ? "جاري الحفظ..." : "حفظ الإعدادات"}
             </Button>
           </div>
         </div>
@@ -624,6 +661,7 @@ export function StudentDailyAttendanceContent({
       <>
         <div className="px-1 py-1">{content}</div>
         {templatesDialog}
+        {autoSendDialog}
         {weeklyScheduleDialog}
       </>
     )
@@ -636,6 +674,7 @@ export function StudentDailyAttendanceContent({
         <div className="container mx-auto max-w-7xl">{content}</div>
       </main>
       {templatesDialog}
+      {autoSendDialog}
       {weeklyScheduleDialog}
       <Footer />
     </div>

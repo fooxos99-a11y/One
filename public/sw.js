@@ -23,7 +23,7 @@ function createOfflineResponse(request) {
     )
   }
 
-  return Promise.resolve(new Response("", { status: 204 }))
+  return Promise.resolve(new Response(null, { status: 204 }))
 }
 
 async function fetchWithFallback(request, fallbackResponse) {
