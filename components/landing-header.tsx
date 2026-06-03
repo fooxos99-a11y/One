@@ -4,11 +4,21 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { LayoutDashboard, LogOut, User } from "lucide-react"
+import { LayoutDashboard, LogOut, Menu, User } from "lucide-react"
 import { LoginForm } from "@/components/login-form"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { performClientLogout } from "@/lib/auth/logout-client"
+
+const ADMIN_LIKE_ROLES = new Set([
+  "admin",
+  "supervisor",
+  "مدير",
+  "سكرتير",
+  "مشرف تعليمي",
+  "مشرف تربوي",
+  "مشرف برامج",
+])
 
 const LANDING_LINKS = [
   { label: "الرئيسية", href: "#home" },
@@ -18,17 +28,20 @@ const LANDING_LINKS = [
 ] as const
 
 function getLandingRoleLabel(role: string) {
+  if (ADMIN_LIKE_ROLES.has(role)) return role === "admin" || role === "supervisor" ? "الإدارة" : role
   if (role === "admin") return "مدير"
   if (role === "supervisor") return "مشرف"
   if (role === "teacher") return "معلم"
   if (role === "deputy_teacher") return "نائب معلم"
   if (role === "student") return "طالب"
-  return "حساب مسجل"
+  return role || "حساب مسجل"
 }
 
 export function LandingHeader() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [isMobileHeaderLinksOpen, setIsMobileHeaderLinksOpen] = useState(false)
+  const [isPortraitMobile, setIsPortraitMobile] = useState(false)
   const [authResolved, setAuthResolved] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState("")
@@ -102,6 +115,32 @@ export function LandingHeader() {
     }
   }, [isLoggedIn, pathname, router, searchParams])
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 767px) and (orientation: portrait)")
+
+    const syncPortraitMobileState = () => {
+      const nextIsPortraitMobile = mediaQuery.matches
+      setIsPortraitMobile(nextIsPortraitMobile)
+      if (!nextIsPortraitMobile) {
+        setIsMobileHeaderLinksOpen(false)
+      }
+    }
+
+    syncPortraitMobileState()
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncPortraitMobileState)
+      return () => mediaQuery.removeEventListener("change", syncPortraitMobileState)
+    }
+
+    mediaQuery.addListener(syncPortraitMobileState)
+    return () => mediaQuery.removeListener(syncPortraitMobileState)
+  }, [])
+
   const handleLoginDialogChange = (open: boolean) => {
     setIsLoginDialogOpen(open)
 
@@ -110,28 +149,43 @@ export function LandingHeader() {
     }
   }
 
-  const goToPrimaryAccountPage = () => {
-    if (userRole === "student") {
-      router.push("/profile?tab=profile")
+  const handleNav = (href: string) => {
+    setIsMobileHeaderLinksOpen(false)
+    router.push(href)
+  }
+
+  const handleLandingAnchorClick = (href: string) => {
+    setIsMobileHeaderLinksOpen(false)
+    if (pathname && pathname !== "/") {
+      router.push(`/${href}`)
       return
     }
 
-    if (userRole === "admin" || userRole === "supervisor") {
-      router.push("/admin/dashboard")
+    const targetId = href.replace(/^#/, "")
+    const target = document.getElementById(targetId)
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" })
       return
     }
 
-    if (userRole === "teacher" || userRole === "deputy_teacher") {
-      router.push("/teacher/dashboard")
-      return
-    }
-
-    router.push("/profile")
+    window.location.hash = href
   }
 
   const handleLogout = () => {
     void performClientLogout(pathname || "/")
   }
+
+  const isStudentAccount = userRole === "student"
+  const isTeacherAccount = userRole === "teacher" || userRole === "deputy_teacher"
+  const isAdminAccount = ADMIN_LIKE_ROLES.has(userRole)
+  const teacherEvaluationPath = (() => {
+    const teacherHalaqah = String(localStorage.getItem("userHalaqah") || "").trim()
+    if (!teacherHalaqah) {
+      return "/teacher/halaqah/1"
+    }
+
+    return `/teacher/halaqah/${encodeURIComponent(teacherHalaqah)}`
+  })()
 
   return (
     <>
@@ -165,12 +219,23 @@ export function LandingHeader() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/halaqat/all"
-              className="site-header-mobile-button inline-flex items-center justify-center rounded-full px-4 text-sm font-black md:hidden"
-            >
-              الحلقات
-            </Link>
+            {isPortraitMobile ? (
+              <button
+                type="button"
+                onClick={() => setIsMobileHeaderLinksOpen((current) => !current)}
+                className="site-header-mobile-button inline-flex h-11 w-11 items-center justify-center rounded-full md:hidden"
+                aria-label="روابط الهيدر"
+              >
+                <Menu size={22} />
+              </button>
+            ) : (
+              <Link
+                href="/halaqat/all"
+                className="site-header-mobile-button inline-flex items-center justify-center rounded-full px-4 text-sm font-black md:hidden"
+              >
+                الحلقات
+              </Link>
+            )}
             {authResolved && isLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -188,12 +253,60 @@ export function LandingHeader() {
                     <div className="mt-1 text-xs font-semibold text-[#6b778c]">{getLandingRoleLabel(userRole)}</div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={goToPrimaryAccountPage} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
-                    <span className="flex w-full items-center justify-between gap-3 text-right">
-                      <span>{userRole === "student" ? "الملف الشخصي" : "لوحة التحكم"}</span>
-                      <LayoutDashboard className="h-4 w-4" />
-                    </span>
+                  {isStudentAccount ? (
+                    <>
+                      <DropdownMenuItem onClick={() => handleNav("/profile?tab=profile")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">الملف الشخصي</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleNav("/daily-challenge")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">التحدي اليومي</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleNav("/store")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">المتجر</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleNav("/pathways")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">المسار</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleNav("/exams")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">الاختبارات</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : null}
+                  {isAdminAccount ? (
+                    <>
+                      <DropdownMenuItem onClick={() => handleNav("/admin/dashboard")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="flex w-full items-center justify-between gap-3 text-right">
+                          <span>لوحة التحكم</span>
+                          <LayoutDashboard className="h-4 w-4" />
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : null}
+                  {isTeacherAccount ? (
+                    <>
+                      <DropdownMenuItem onClick={() => handleNav("/teacher/dashboard")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">التحضير</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleNav(teacherEvaluationPath)} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">التقييم اليومي</span>
+                      </DropdownMenuItem>
+                      {userRole === "teacher" ? (
+                        <DropdownMenuItem onClick={() => handleNav("/teacher/student-plans")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                          <span className="w-full text-right">خطط الطلاب</span>
+                        </DropdownMenuItem>
+                      ) : null}
+                      <DropdownMenuItem onClick={() => handleNav("/teacher/weekly-reports")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                        <span className="w-full text-right">تقارير الأسابيع</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : null}
+                  <DropdownMenuItem onClick={() => handleNav("/notifications")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                    <span className="w-full text-right">الإشعارات</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={handleLogout} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-red-600 focus:bg-red-50 focus:text-red-600" dir="rtl">
                     <span className="flex w-full items-center justify-between gap-3 text-right">
                       <span>تسجيل الخروج</span>
@@ -215,6 +328,55 @@ export function LandingHeader() {
           </div>
         </div>
       </header>
+
+      {isPortraitMobile ? (
+        <>
+          <div
+            className={`fixed inset-0 z-[55] bg-black/25 transition-opacity duration-200 md:hidden ${isMobileHeaderLinksOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+            onClick={() => setIsMobileHeaderLinksOpen(false)}
+          />
+          <div
+            dir="rtl"
+            className={`fixed left-4 right-4 top-[5.5rem] z-[60] rounded-[28px] border border-[#d9e4fb] bg-white/95 p-3 shadow-[0_24px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl transition-all duration-200 md:hidden ${isMobileHeaderLinksOpen ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
+          >
+            <div className="grid gap-2">
+              {LANDING_LINKS.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => handleLandingAnchorClick(item.href)}
+                  className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
+                >
+                  <span>{item.label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => handleNav("/halaqat/all")}
+                className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
+              >
+                <span>أفضل الحلقات</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNav("/students/all")}
+                className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
+              >
+                <span>أفضل الطلاب</span>
+              </button>
+              {(isTeacherAccount || isAdminAccount) ? (
+                <button
+                  type="button"
+                  onClick={() => handleNav("/competitions")}
+                  className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
+                >
+                  <span>المسابقات</span>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <Dialog open={isLoginDialogOpen} onOpenChange={handleLoginDialogChange}>
         <DialogContent className="max-w-[92vw] rounded-[22px] border border-[#dbe5f1] bg-white p-6 shadow-[0_18px_50px_rgba(18,37,84,0.14)] sm:max-w-md" dir="rtl">
