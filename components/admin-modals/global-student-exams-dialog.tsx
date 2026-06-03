@@ -577,7 +577,7 @@ export function GlobalStudentExamsDialog({
                     <Label className="text-sm font-black text-[#334155]">الطالب</Label>
                     <Select
                       key={examDialogCircle || "no-circle"}
-                      value={form.studentId || undefined}
+                      value={form.studentId}
                       onValueChange={(value) => setForm((current) => ({ ...current, studentId: value, selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))}
                       dir="rtl"
                       disabled={!examDialogCircle || isExamDialogLoading || examDialogStudents.length === 0}
@@ -603,7 +603,7 @@ export function GlobalStudentExamsDialog({
 
                     <div className="space-y-2 text-right">
                       <Label className="text-sm font-black text-[#334155]">{portionUnitLabel} المراد اختباره</Label>
-                      <Select key={form.studentId || "no-student"} value={form.selectedJuz || undefined} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl" disabled={!selectedStudent || isExamDialogLoading}>
+                      <Select key={form.studentId || "no-student"} value={form.selectedJuz} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl" disabled={!selectedStudent || isExamDialogLoading}>
                         <SelectTrigger className="h-12 rounded-2xl border-[#d7e3f2] bg-white">
                           <SelectValue placeholder={selectedStudent ? `اختر ${portionUnitLabel}` : "اختر الطالب أولاً"} />
                         </SelectTrigger>

@@ -12,6 +12,7 @@ import { SiteLoader } from "@/components/ui/site-loader"
 import { ShoppingBag, Palette } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 import { getSupabase } from "@/lib/supabase"
+import { resolveStoreImageSrc } from "@/lib/store-images"
 
 const THEME_EMOJI: Record<string, string> = {
   bats: '🦇', fire: '🔥', snow: '❄️', leaves: '🍃',
@@ -285,7 +286,7 @@ export default function StorePage() {
                             })() : (
                               <div className="relative flex min-h-[10.5rem] w-full items-center justify-center bg-white p-3 sm:min-h-[13rem] md:h-56 md:p-5">
                                 {prod.image_url ? (
-                                  <img src={prod.image_url} alt={prod.name}
+                                  <img src={resolveStoreImageSrc(prod.image_url)} alt={prod.name}
                                     className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105" />
                                 ) : (
                                   <ShoppingBag className="w-16 h-16 text-gray-200" />

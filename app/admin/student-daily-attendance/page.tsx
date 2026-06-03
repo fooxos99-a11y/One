@@ -24,7 +24,6 @@ import {
 } from "@/lib/attendance-save-notification-templates"
 import {
   ATTENDANCE_AUTO_SEND_SETTINGS_ID,
-  ATTENDANCE_WEEKLY_REPORT_LOG_SETTING_ID,
   DEFAULT_ATTENDANCE_AUTO_SEND_SETTINGS,
 } from "@/lib/site-settings-constants"
 
@@ -35,15 +34,6 @@ type AttendanceAutoSendForm = {
   mode: AttendanceAutoSendMode
   weeklySendDay: AttendanceWeeklySendDay
   weeklySendTime: string
-}
-
-type AttendanceWeeklyReportLogEntry = {
-  weekKey: string
-  weekStart: string
-  weekEnd: string
-  studentIds: string[]
-  sentAt: string
-  queuedCount: number
 }
 
 const WEEKLY_SEND_DAY_OPTIONS: Array<{ value: AttendanceWeeklySendDay; label: string }> = [
@@ -67,39 +57,6 @@ function normalizeAttendanceAutoSendSettings(value: unknown): AttendanceAutoSend
     : DEFAULT_ATTENDANCE_AUTO_SEND_SETTINGS.weeklySendTime
 
   return { mode, weeklySendDay, weeklySendTime }
-}
-
-function normalizeAttendanceWeeklyReportLogEntry(value: unknown) {
-  const candidate = value && typeof value === "object" ? (value as { entries?: unknown[] }) : {}
-  const entries = Array.isArray(candidate.entries) ? candidate.entries : []
-  const latestEntry = entries[entries.length - 1]
-
-  if (!latestEntry || typeof latestEntry !== "object") {
-    return null
-  }
-
-  const normalizedEntry = latestEntry as Partial<AttendanceWeeklyReportLogEntry>
-  const weekKey = String(normalizedEntry.weekKey || "").trim()
-  const weekStart = String(normalizedEntry.weekStart || "").trim()
-  const weekEnd = String(normalizedEntry.weekEnd || "").trim()
-  const sentAt = String(normalizedEntry.sentAt || "").trim()
-
-  if (!weekKey || !weekStart || !weekEnd || !sentAt) {
-    return null
-  }
-
-  return {
-    weekKey,
-    weekStart,
-    weekEnd,
-    sentAt,
-    queuedCount: Math.max(0, Math.floor(Number(normalizedEntry.queuedCount) || 0)),
-    studentIds: Array.isArray(normalizedEntry.studentIds) ? normalizedEntry.studentIds.map((studentId) => String(studentId || "").trim()).filter(Boolean) : [],
-  }
-}
-
-function getWeeklySendDayLabel(day: AttendanceWeeklySendDay) {
-  return WEEKLY_SEND_DAY_OPTIONS.find((option) => option.value === day)?.label || "الخميس"
 }
 
 function translateLevel(level: string | null | undefined) {
@@ -210,7 +167,6 @@ export function StudentDailyAttendanceContent({
   const [attendanceAutoSendForm, setAttendanceAutoSendForm] = useState<AttendanceAutoSendForm>(
     normalizeAttendanceAutoSendSettings(DEFAULT_ATTENDANCE_AUTO_SEND_SETTINGS),
   )
-  const [latestWeeklyReportLog, setLatestWeeklyReportLog] = useState<AttendanceWeeklyReportLogEntry | null>(null)
 
   const getSaudiDate = () => {
     return new Intl.DateTimeFormat('en-CA', {
@@ -242,7 +198,6 @@ export function StudentDailyAttendanceContent({
     if (!authLoading && authVerified) {
       void loadAttendanceTemplates()
       void loadAttendanceAutoSendSettings()
-      void loadAttendanceWeeklyReportLog()
     }
   }, [authLoading, authVerified])
 
@@ -331,7 +286,6 @@ export function StudentDailyAttendanceContent({
 
       setAttendanceTemplatesForm(normalizeAttendanceSaveNotificationTemplates(attendanceTemplatesForm))
       setAttendanceAutoSendForm(normalizeAttendanceAutoSendSettings(attendanceAutoSendForm))
-      await loadAttendanceWeeklyReportLog()
       setIsTemplatesDialogOpen(false)
       await showAlert("تم حفظ قوالب الرسائل وإعدادات الإرسال التلقائي", "نجاح")
     } catch (error) {
@@ -353,22 +307,6 @@ export function StudentDailyAttendanceContent({
       setAttendanceAutoSendForm(normalizeAttendanceAutoSendSettings(data.value))
     } catch (error) {
       console.error("Error loading attendance auto send settings:", error)
-    }
-  }
-
-  const loadAttendanceWeeklyReportLog = async () => {
-    try {
-      const response = await fetch(`/api/site-settings?id=${ATTENDANCE_WEEKLY_REPORT_LOG_SETTING_ID}`, { cache: "no-store" })
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "تعذر جلب سجل الإرسال الأسبوعي")
-      }
-
-      setLatestWeeklyReportLog(normalizeAttendanceWeeklyReportLogEntry(data.value))
-    } catch (error) {
-      console.error("Error loading attendance weekly report log:", error)
-      setLatestWeeklyReportLog(null)
     }
   }
 
@@ -592,51 +530,20 @@ export function StudentDailyAttendanceContent({
         </DialogHeader>
         <div className="space-y-4 pt-2 text-right">
           <div className="rounded-[26px] border border-[#d8e4fb] bg-[#f8fbff] p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="space-y-3">
-                <div>
-                  <div className="text-base font-black text-[#1a2332]">الإرسال التلقائي</div>
-                  <div className="mt-1 text-sm leading-6 text-[#526071]">اختيار إداري عام فقط. التقرير الأسبوعي يعتمد على السجلات التي تم تسجيلها فعليًا من الأحد إلى الخميس، مع منع تكرار نفس الأسبوع مرتين.</div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-[220px_1fr] sm:items-end">
-                  <div className="space-y-2">
-                    <div className="text-sm font-bold text-[#1a2332]">نوع الإرسال</div>
-                    <Select value={attendanceAutoSendForm.mode} onValueChange={handleAutoSendModeChange}>
-                      <SelectTrigger className="border-[#d8e4fb] bg-white text-base focus:ring-[#3453a7]/30">
-                        <SelectValue placeholder="اختر نوع الإرسال" />
-                      </SelectTrigger>
-                      <SelectContent dir="rtl">
-                        <SelectItem value="daily">يومي</SelectItem>
-                        <SelectItem value="weekly">أسبوعي</SelectItem>
-                        <SelectItem value="none">إيقاف</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="rounded-2xl border border-[#e6edf6] bg-white px-4 py-3 text-sm leading-7 text-[#526071]">
-                    <div>الوضع الحالي: <span className="font-black text-[#1a2332]">{attendanceAutoSendForm.mode === "daily" ? "يومي" : attendanceAutoSendForm.mode === "weekly" ? "أسبوعي" : "إيقاف"}</span></div>
-                    <div>يوم الإرسال: <span className="font-black text-[#1a2332]">{getWeeklySendDayLabel(attendanceAutoSendForm.weeklySendDay)}</span></div>
-                    <div>الوقت: <span className="font-black text-[#1a2332]">{attendanceAutoSendForm.weeklySendTime}</span></div>
-                  </div>
-                </div>
-                {attendanceAutoSendForm.mode === "weekly" ? (
-                  <div className="flex justify-start">
-                    <Button type="button" variant="outline" onClick={() => setIsWeeklyScheduleDialogOpen(true)} className="h-10 rounded-full border-[#d8e4fb] bg-white px-5 text-[#3453a7] hover:bg-[#f6f9ff]">
-                      إعداد يوم الإرسال والوقت
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-              <div className="rounded-2xl border border-[#e6edf6] bg-white px-4 py-4 text-sm leading-7 text-[#526071]">
-                <div className="text-sm font-black text-[#1a2332]">آخر إرسال أسبوعي مسجل</div>
-                {latestWeeklyReportLog ? (
-                  <div className="mt-2 space-y-1">
-                    <div>الفترة: <span className="font-black text-[#1a2332]">من {latestWeeklyReportLog.weekStart} إلى {latestWeeklyReportLog.weekEnd}</span></div>
-                    <div>الرسائل المضافة للطابور: <span className="font-black text-[#1a2332]">{latestWeeklyReportLog.queuedCount}</span></div>
-                    <div>آخر تنفيذ: <span className="font-black text-[#1a2332]">{latestWeeklyReportLog.sentAt}</span></div>
-                  </div>
-                ) : (
-                  <div className="mt-2">لا يوجد إرسال أسبوعي محفوظ بعد.</div>
-                )}
+            <div className="space-y-3">
+              <div className="text-base font-black text-[#1a2332]">الإرسال التلقائي</div>
+              <div className="max-w-[220px] space-y-2">
+                <div className="text-sm font-bold text-[#1a2332]">نوع الإرسال</div>
+                <Select value={attendanceAutoSendForm.mode} onValueChange={handleAutoSendModeChange}>
+                  <SelectTrigger className="border-[#d8e4fb] bg-white text-base focus:ring-[#3453a7]/30">
+                    <SelectValue placeholder="اختر نوع الإرسال" />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl">
+                    <SelectItem value="daily">يومي</SelectItem>
+                    <SelectItem value="weekly">أسبوعي</SelectItem>
+                    <SelectItem value="none">إيقاف</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

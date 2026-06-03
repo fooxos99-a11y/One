@@ -7,6 +7,33 @@ const APP_SHELL = [
   "/%D8%B4%D8%B9%D8%A7%D8%B1%20%D8%A7%D9%84%D8%AC%D9%88%D8%A7%D9%84.png",
 ]
 
+function createOfflineResponse(request) {
+  const acceptHeader = request.headers.get("accept") || ""
+
+  if (request.mode === "navigate" || acceptHeader.includes("text/html")) {
+    return caches.match(OFFLINE_URL)
+  }
+
+  if (acceptHeader.includes("application/json") || request.url.includes("/api/")) {
+    return Promise.resolve(
+      new Response(JSON.stringify({ error: "offline" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      }),
+    )
+  }
+
+  return Promise.resolve(new Response("", { status: 204 }))
+}
+
+async function fetchWithFallback(request, fallbackResponse) {
+  try {
+    return await fetch(request)
+  } catch {
+    return fallbackResponse
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
@@ -38,35 +65,42 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isApiRequest || isNextAsset || event.request.cache === "no-store") {
-    event.respondWith(fetch(event.request))
+    event.respondWith(
+      fetchWithFallback(
+        event.request,
+        caches.match(event.request).then((cachedResponse) => cachedResponse || createOfflineResponse(event.request)),
+      ),
+    )
     return
   }
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
+      fetchWithFallback(
+        event.request,
+        caches.match(event.request).then((cachedPage) => cachedPage || caches.match(OFFLINE_URL)),
+      )
         .then((response) => {
           const copy = response.clone()
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
           return response
         })
-        .catch(async () => {
-          const cachedPage = await caches.match(event.request)
-          return cachedPage || caches.match(OFFLINE_URL)
-        }),
+        .catch(() => caches.match(OFFLINE_URL)),
     )
     return
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const networkFetch = fetch(event.request)
+      const networkFetch = fetchWithFallback(
+        event.request,
+        Promise.resolve(cachedResponse).then((response) => response || createOfflineResponse(event.request)),
+      )
         .then((response) => {
           const copy = response.clone()
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
           return response
         })
-        .catch(() => cachedResponse)
 
       return cachedResponse || networkFetch
     }),

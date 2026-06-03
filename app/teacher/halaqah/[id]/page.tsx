@@ -1076,7 +1076,7 @@ export default function HalaqahManagement() {
 			>
 				<div className="font-semibold text-[#1a2332] text-center">{label}</div>
 					<Select
-						value={currentLevel ?? undefined}
+						value={currentLevel ?? ""}
 						onValueChange={(value) => setEvaluation(studentId, type, value as Exclude<EvaluationLevel, null>)}
 						disabled={isDisabled}
 					>
@@ -1235,7 +1235,7 @@ export default function HalaqahManagement() {
 															)}
 															<div className="space-y-1">
 																<Select
-																	value={student.attendance ?? undefined}
+																	value={student.attendance ?? ""}
 																	onValueChange={(value) => toggleAttendance(student.id, value as AttendanceStatus)}
 																	disabled={student.savedToday}
 																>

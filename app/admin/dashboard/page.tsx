@@ -293,7 +293,7 @@ const adminSections: DashboardSection[] = [
         description: "الانتقال السريع إلى واجهة اختبار الطلاب الإدارية.",
         icon: ClipboardCheck,
         permissionKey: "اختبار الطلاب",
-        getPath: () => "/admin/dashboard?action=student-exams",
+        getPath: () => "/admin/dashboard",
       },
       {
         key: "general-pathways",
@@ -491,6 +491,7 @@ export default function AdminDashboardPage() {
   const [recitationDayInlineActions, setRecitationDayInlineActions] = useState({
     openTemplates: () => {},
     openArchive: () => {},
+    isArchiveView: false,
   })
   const [whatsAppSendInlineActions, setWhatsAppSendInlineActions] = useState({
     toggleRepliesView: () => {},
@@ -504,6 +505,10 @@ export default function AdminDashboardPage() {
     openOrders: () => {},
     openAddProduct: () => {},
     openAddCategory: () => {},
+    toggleStoreStatus: () => {},
+    isStoreOpen: true,
+    isStoreStatusLoading: false,
+    isSavingStoreStatus: false,
   })
   const [storeDashboardView, setStoreDashboardView] = useState<"catalog" | "orders">("catalog")
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatusSummary | null>(null)
@@ -720,8 +725,12 @@ export default function AdminDashboardPage() {
   }, [activeAction])
 
   const activeDialogAction = useMemo(() => {
-    if (!activeAction?.resolvedPath) {
+    if (!activeAction) {
       return null
+    }
+
+    if (activeAction.key === "general-student-exams") {
+      return "student-exams" as const
     }
 
     if (activeAction.resolvedPath.includes("action=add-student")) {
@@ -953,6 +962,7 @@ export default function AdminDashboardPage() {
       setRecitationDayInlineActions({
         openTemplates: () => {},
         openArchive: () => {},
+        isArchiveView: false,
       })
     }
   }, [activeInlinePage])
@@ -981,6 +991,10 @@ export default function AdminDashboardPage() {
         openOrders: () => {},
         openAddProduct: () => {},
         openAddCategory: () => {},
+        toggleStoreStatus: () => {},
+        isStoreOpen: true,
+        isStoreStatusLoading: false,
+        isSavingStoreStatus: false,
       })
       setStoreDashboardView("catalog")
     }
@@ -1096,7 +1110,7 @@ export default function AdminDashboardPage() {
 
                       <div className={`grid transition-all duration-300 ease-out ${isExpanded ? "mt-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
                         <div className="overflow-hidden">
-                          <div className="theme-admin-muted-surface space-y-1.5 rounded-2xl p-2">
+                          <div className="space-y-1.5 rounded-2xl border border-[#edf1f7] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
                           {section.items.map((item) => {
                             const ItemIcon = item.icon
                             const isSelected = activeAction?.key === item.key
@@ -1112,13 +1126,13 @@ export default function AdminDashboardPage() {
                                 }}
                                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                                   isSelected
-                                    ? "theme-chip-selected ring-1 ring-[color:color-mix(in_srgb,var(--primary)_14%,transparent_86%)]"
-                                    : "theme-chip-hover text-[#36506f]"
+                                    ? "border border-[#cfe0ff] bg-[#edf4ff] text-[#24428f]"
+                                    : "text-[#36506f] hover:bg-[#f8fbff]"
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5">
                                   <span>{item.resolvedLabel}</span>
-                                  <ItemIcon className="size-4 text-[var(--button-outline-text)]" />
+                                  <ItemIcon className={`size-4 ${isSelected ? "text-[#3453a7]" : "text-[var(--button-outline-text)]"}`} />
                                 </div>
                               </button>
                             )
@@ -1427,7 +1441,7 @@ export default function AdminDashboardPage() {
                         className={dashboardSolidButtonClass}
                       >
                         <Archive className="h-4 w-4" />
-                        الأرشيف
+                        {recitationDayInlineActions.isArchiveView ? "العودة" : "الأرشيف"}
                       </button>
                     </>
                   ) : null}
@@ -1440,6 +1454,20 @@ export default function AdminDashboardPage() {
                       >
                         <ShoppingBag className="h-4 w-4" />
                         {storeDashboardView === "orders" ? "العودة للمتجر" : "طلبات الطلاب"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => storeInlineActions.toggleStoreStatus()}
+                        disabled={storeInlineActions.isStoreStatusLoading || storeInlineActions.isSavingStoreStatus}
+                        className={`${storeInlineActions.isStoreOpen ? dashboardOutlineButtonClass : dashboardSolidButtonClass} justify-center disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        {storeInlineActions.isSavingStoreStatus
+                          ? "جاري الحفظ..."
+                          : storeInlineActions.isStoreStatusLoading
+                            ? "جاري التحقق..."
+                            : storeInlineActions.isStoreOpen
+                              ? "إغلاق المتجر"
+                              : "فتح المتجر"}
                       </button>
                       {storeDashboardView === "orders" ? null : <DropdownMenu>
                         <DropdownMenuTrigger asChild>

@@ -227,7 +227,7 @@ export function RecitationDayContent({
   onInlineActionsChange,
 }: {
   displayMode?: "page" | "inline"
-  onInlineActionsChange?: (actions: { openTemplates: () => void; openArchive: () => void }) => void
+  onInlineActionsChange?: (actions: { openTemplates: () => void; openArchive: () => void; isArchiveView: boolean }) => void
 }) {
   const router = useRouter()
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("يوم السرد")
@@ -272,6 +272,7 @@ export function RecitationDayContent({
   const [isSavingGradingSettings, setIsSavingGradingSettings] = useState(false)
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
   const [isGradingSettingsDialogOpen, setIsGradingSettingsDialogOpen] = useState(false)
+  const [isArchiveView, setIsArchiveView] = useState(false)
 
   useEffect(() => {
     if (displayMode !== "inline" || !onInlineActionsChange) {
@@ -280,16 +281,18 @@ export function RecitationDayContent({
 
     onInlineActionsChange({
       openTemplates: () => setIsTemplatesDialogOpen(true),
-      openArchive: () => router.push("/admin/recitation-day/archive"),
+      openArchive: () => setIsArchiveView((current) => !current),
+      isArchiveView,
     })
 
     return () => {
       onInlineActionsChange({
         openTemplates: () => {},
         openArchive: () => {},
+        isArchiveView: false,
       })
     }
-  }, [displayMode, onInlineActionsChange, router])
+  }, [displayMode, isArchiveView, onInlineActionsChange])
 
   async function loadNotificationTemplates() {
     try {
@@ -882,7 +885,97 @@ export function RecitationDayContent({
             </div>
           </CardHeader>
           <CardContent>
-            {!currentDay ? (
+            {displayMode === "inline" && isArchiveView ? (
+              <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
+                <Card className="rounded-[30px] border-[#dde6f0] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
+                  <CardHeader className="text-right">
+                    <CardTitle className="text-xl font-black text-[#1a2332]">الحلقات المؤرشفة</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {archiveDays.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-[#d8e4fb] px-4 py-6 text-center text-sm text-[#64748b]">لا توجد حلقات مؤرشفة بعد</div>
+                    ) : archiveDays.map((day) => (
+                      <div key={day.id} className={`rounded-[22px] border px-4 py-4 transition-all ${selectedArchiveDayId === day.id ? "border-[#3453a7] bg-[#f5f8ff]" : "border-[#e5edf6] bg-white"}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <button type="button" onClick={() => void loadArchiveDayDetails(day.id)} className="flex-1 text-right">
+                            <div className="text-lg font-black text-[#1a2332]">{String(day.halaqah || "").trim() || "حلقة غير محددة"}</div>
+                            <div className="mt-2 text-sm text-[#64748b]">{getRecitationDateRangeLabel(day.recitation_date, day.recitation_end_date)}</div>
+                          </button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void deleteArchiveDay(day)}
+                            disabled={deletingArchiveId === day.id}
+                            className="h-9 w-9 rounded-full p-0 text-[#b91c1c] hover:bg-[#fff1f2] hover:text-[#991b1b]"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[30px] border-[#dde6f0] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
+                  <CardContent className="space-y-5 pt-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="space-y-1 text-right">
+                        <div className="text-base font-black text-[#1a2332]">أرشيف يوم السرد</div>
+                        <div className="text-sm text-[#64748b]">{selectedArchiveDate || "اختر أرشيفًا من القائمة لعرض تفاصيله"}</div>
+                      </div>
+                      <div className="w-full lg:w-[240px]">
+                        <StyledSelect value={selectedArchiveHalaqah} onChange={(event) => setSelectedArchiveHalaqah(event.target.value)}>
+                          <option value="all">كل الحلقات</option>
+                          {archiveHalaqahOptions.map((halaqah) => <option key={halaqah} value={halaqah}>{halaqah}</option>)}
+                        </StyledSelect>
+                      </div>
+                    </div>
+
+                    {isArchiveLoading ? (
+                      <div className="flex items-center justify-center py-16"><SiteLoader size="sm" color="#3453a7" /></div>
+                    ) : selectedArchiveDayId ? (
+                      <div className="overflow-hidden rounded-[24px] border border-[#ebeff5] bg-white">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className={tableHeadClassName}>الطالب</TableHead>
+                              <TableHead className={tableHeadClassName}>الحلقة</TableHead>
+                              <TableHead className={tableHeadClassName}>اسم المعلم</TableHead>
+                              <TableHead className={tableHeadClassName}>حالة السرد</TableHead>
+                              <TableHead className={tableHeadClassName}>المقيّم</TableHead>
+                              <TableHead className={tableHeadClassName}>المسمّع</TableHead>
+                              <TableHead className={tableHeadClassName}>الملاحظات</TableHead>
+                              <TableHead className="h-12 w-14 whitespace-nowrap align-middle text-center text-sm font-bold text-[#1a2332]"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredArchiveStudents.map((student) => (
+                              <TableRow key={student.id}>
+                                <TableCell className="text-right font-bold">{student.student_name}</TableCell>
+                                <TableCell className="text-right">{student.halaqah || "-"}</TableCell>
+                                <TableCell className="text-right">{student.teacher_name || "-"}</TableCell>
+                                <TableCell className="text-right">{getStatusLabel(student.overall_status)}</TableCell>
+                                <TableCell className="text-right">{student.evaluator_name || "-"}</TableCell>
+                                <TableCell className="text-right">{student.heard_amount_text || "-"}</TableCell>
+                                <TableCell className="max-w-[240px] text-right">{student.notes || "-"}</TableCell>
+                                <TableCell className="text-center">
+                                  <Button type="button" variant="outline" className="rounded-full px-4" onClick={() => setArchiveDetailsStudent(student)}>
+                                    <Eye className="me-2 h-4 w-4" />
+                                    التفاصيل
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[#d8e4fb] px-4 py-10 text-center text-sm text-[#64748b]">لا توجد بيانات لعرضها</div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : !currentDay ? (
               <div className="flex flex-col items-start justify-between gap-4 rounded-[24px] border border-[#e8eef7] bg-[#fafcff] p-4 sm:flex-row sm:items-center">
                 <div className="space-y-1 text-right">
                   <div className="text-base font-black text-[#1a2332]">لا يوجد يوم سرد مفتوح</div>

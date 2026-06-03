@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Header } from "@/components/header";
@@ -9,8 +9,9 @@ import { Footer } from "@/components/footer";
 import { SiteLoader } from "@/components/ui/site-loader"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ShoppingBag, Tag, Package, Plus, Trash2, Image as ImageIcon, X, Lock, Unlock } from "lucide-react";
+import { ShoppingBag, Tag, Package, Plus, Trash2, Image as ImageIcon, X } from "lucide-react";
 import { useAdminAuth } from "@/hooks/use-admin-auth"
+import { resolveStoreImageSrc } from "@/lib/store-images"
 
 type StoreAddDialogView = "product" | "category" | null
 
@@ -19,13 +20,19 @@ export function StoreManagementContent({
   onInlineActionsChange,
 }: {
   displayMode?: "page" | "inline"
-  onInlineActionsChange?: (actions: { openOrders: () => void; openAddProduct: () => void; openAddCategory: () => void }) => void
+  onInlineActionsChange?: (actions: {
+    openOrders: () => void
+    openAddProduct: () => void
+    openAddCategory: () => void
+    toggleStoreStatus: () => void
+    isStoreOpen: boolean
+    isStoreStatusLoading: boolean
+    isSavingStoreStatus: boolean
+  }) => void
 }) {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة المتجر");
   const searchParams = useSearchParams();
   const isEmbedded = displayMode === "inline" || searchParams.get("embedded") === "1";
-
-  const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [addDialogView, setAddDialogView] = useState<StoreAddDialogView>(null);
@@ -48,26 +55,6 @@ export function StoreManagementContent({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!onInlineActionsChange) {
-      return
-    }
-
-    onInlineActionsChange({
-      openOrders: () => {},
-      openAddProduct: () => setAddDialogView("product"),
-      openAddCategory: () => setAddDialogView("category"),
-    })
-
-    return () => {
-      onInlineActionsChange({
-        openOrders: () => {},
-        openAddProduct: () => {},
-        openAddCategory: () => {},
-      })
-    }
-  }, [onInlineActionsChange, router])
 
   useEffect(() => {
     void Promise.all([fetchData(), fetchStoreStatus()]);
@@ -96,7 +83,7 @@ export function StoreManagementContent({
     }
   }
 
-  async function handleToggleStoreStatus() {
+  const handleToggleStoreStatus = useCallback(async () => {
     setIsSavingStoreStatus(true)
     try {
       const response = await fetch("/api/store/status", {
@@ -117,7 +104,35 @@ export function StoreManagementContent({
     } finally {
       setIsSavingStoreStatus(false)
     }
-  }
+  }, [isStoreOpen])
+
+  useEffect(() => {
+    if (!onInlineActionsChange) {
+      return
+    }
+
+    onInlineActionsChange({
+      openOrders: () => {},
+      openAddProduct: () => setAddDialogView("product"),
+      openAddCategory: () => setAddDialogView("category"),
+      toggleStoreStatus: () => void handleToggleStoreStatus(),
+      isStoreOpen,
+      isStoreStatusLoading,
+      isSavingStoreStatus,
+    })
+
+    return () => {
+      onInlineActionsChange({
+        openOrders: () => {},
+        openAddProduct: () => {},
+        openAddCategory: () => {},
+        toggleStoreStatus: () => {},
+        isStoreOpen: true,
+        isStoreStatusLoading: false,
+        isSavingStoreStatus: false,
+      })
+    }
+  }, [handleToggleStoreStatus, isSavingStoreStatus, isStoreOpen, isStoreStatusLoading, onInlineActionsChange])
 
   async function handleAddProduct(e: any) {
     e.preventDefault();
@@ -129,16 +144,21 @@ export function StoreManagementContent({
     let imageUrl = null;
     try {
       if (imageFile) {
-        const supabase = getSupabase();
-        const fileExt = imageFile.name.split(".").pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const { error } = await supabase.storage.from("store-products").upload(fileName, imageFile);
-        if (error) {
-          alert("فشل رفع الصورة: " + error.message);
+        const formData = new FormData()
+        formData.append("file", imageFile)
+
+        const uploadResponse = await fetch("/api/store/upload-image", {
+          method: "POST",
+          body: formData,
+        })
+
+        const uploadData = await uploadResponse.json().catch(() => null)
+        if (!uploadResponse.ok || !uploadData?.url) {
+          alert("فشل رفع الصورة: " + (uploadData?.error || "تعذر رفع الصورة"));
           setLoading(false);
           return;
         }
-        imageUrl = supabase.storage.from("store-products").getPublicUrl(fileName).data.publicUrl;
+        imageUrl = uploadData.url
       }
       const supabase = getSupabase();
       const { error: insertError } = await supabase.from("store_products").insert({
@@ -207,32 +227,6 @@ export function StoreManagementContent({
   const content = (
     <div className="container mx-auto max-w-5xl space-y-8">
       <div className="overflow-hidden rounded-[2rem] border border-[#e5edf8] bg-white shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2">
-              <span className={`rounded-full px-3 py-1 text-xs font-bold ${isStoreOpen ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "border border-red-200 bg-red-50 text-red-600"}`}>
-                {isStoreStatusLoading ? "جاري التحقق..." : isStoreOpen ? "المتجر مفتوح" : "المتجر مغلق"}
-              </span>
-              <h2 className="text-lg font-black text-[#1a2332]">حالة المتجر</h2>
-            </div>
-            <p className="mt-2 text-sm text-[#6c7d95]">عند إغلاق المتجر يختفي زر المتجر من الطلاب وتُمنع صفحة المتجر وطلبات الشراء.</p>
-          </div>
-          <Button
-            type="button"
-            onClick={handleToggleStoreStatus}
-            disabled={isStoreStatusLoading || isSavingStoreStatus}
-            className={`h-11 rounded-2xl px-6 text-sm font-black text-white ${isStoreOpen ? "bg-red-500 hover:bg-red-600" : "bg-[#3453a7] hover:bg-[#24428f]"}`}
-          >
-            {isSavingStoreStatus ? "جاري الحفظ..." : isStoreOpen ? (
-              <span className="inline-flex items-center gap-2"><Lock className="h-4 w-4" />إغلاق المتجر</span>
-            ) : (
-              <span className="inline-flex items-center gap-2"><Unlock className="h-4 w-4" />فتح المتجر</span>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-[2rem] border border-[#e5edf8] bg-white shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
         <div className="flex items-center justify-between border-b border-[#e7eef8] px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#3453a7]/30 bg-[#3453a7]/10">
@@ -262,7 +256,7 @@ export function StoreManagementContent({
                 <div key={prod.id} className="flex items-center gap-4 rounded-[1.5rem] border border-[#edf2fb] bg-[#fbfcff] p-4 transition-colors hover:bg-white">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#dbe6f7] bg-white">
                     {prod.image_url ? (
-                      <img src={prod.image_url} alt={prod.name} className="h-full w-full object-cover" />
+                      <img src={resolveStoreImageSrc(prod.image_url)} alt={prod.name} className="h-full w-full object-cover" />
                     ) : (
                       <ImageIcon className="h-6 w-6 text-[#3453a7]/35" />
                     )}

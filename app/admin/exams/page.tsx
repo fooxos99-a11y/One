@@ -887,7 +887,7 @@ export function ExamsContent({
                               <TableCell className="text-right font-bold text-[#1f2937]">{row.student.name}</TableCell>
                               <TableCell className="text-right">
                                 {hasAvailablePortions ? (
-                                  <Select value={row.draftPortionNumber || undefined} onValueChange={(value) => updateScheduleDraft(row.student.id, { juzNumber: value })} dir="rtl">
+                                  <Select value={row.draftPortionNumber || ""} onValueChange={(value) => updateScheduleDraft(row.student.id, { juzNumber: value })} dir="rtl">
                                     <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-right">
                                       <SelectValue placeholder={`اختر ${portionUnitLabel}`} />
                                     </SelectTrigger>
