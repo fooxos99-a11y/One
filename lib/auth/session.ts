@@ -29,7 +29,12 @@ export function normalizeAppRole(role: string | null | undefined): AppRole | nul
     return "supervisor"
   }
 
-  return null
+  if (normalizedRole.startsWith("مشرف")) {
+    return "supervisor"
+  }
+
+  // Any remaining role stored in the users table is treated as an administrative staff role.
+  return "admin"
 }
 
 export type SessionUser = {

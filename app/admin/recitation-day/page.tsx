@@ -920,7 +920,6 @@ export function RecitationDayContent({
                         <TableHead className={tableHeadClassName}>ملاحظات المقيّم</TableHead>
                         <TableHead className={tableHeadClassName}>المسمّع</TableHead>
                         <TableHead className="h-12 w-14 whitespace-nowrap align-middle text-center text-sm font-bold text-[#1a2332]"></TableHead>
-                        <TableHead className="h-12 w-14 whitespace-nowrap align-middle text-center text-sm font-bold text-[#1a2332]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -934,7 +933,6 @@ export function RecitationDayContent({
                           <TableCell className="max-w-[240px] text-right">{student.notes || "-"}</TableCell>
                           <TableCell className="max-w-[220px] text-right">{student.heard_amount_text || "-"}</TableCell>
                           <TableCell className="text-center"><Button type="button" variant="outline" className="rounded-full px-4" onClick={() => setEditingStudent(student)}>التقييم</Button></TableCell>
-                          <TableCell className="text-center"><Button type="button" variant="ghost" className="rounded-full px-4 text-[#3453a7]" onClick={() => setDetailsStudent(student)}>التفاصيل</Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

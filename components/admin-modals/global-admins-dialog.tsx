@@ -42,6 +42,7 @@ export function GlobalAdminsDialog() {
   const [roles, setRoles] = useState<string[]>([])
   const [isAddMode, setIsAddMode] = useState(false)
   const [isAddRoleMode, setIsAddRoleMode] = useState(false)
+  const [editingAdminId, setEditingAdminId] = useState<string | null>(null)
   const [newRoleName, setNewRoleName] = useState("")
   const [editingRoleName, setEditingRoleName] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -223,9 +224,10 @@ export function GlobalAdminsDialog() {
     setIsSubmitting(true)
     try {
       const response = await fetch("/api/admin-users", {
-        method: "POST",
+        method: editingAdminId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: editingAdminId,
           name: newAdmin.name,
           account_number: newAdmin.account_number,
           phone_number: newAdmin.phone_number || null,
@@ -236,15 +238,28 @@ export function GlobalAdminsDialog() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "حدث خطأ أثناء الإضافة")
 
-      toast({ title: "نجاح", description: "تم إضافة المستخدم بنجاح" })
+      toast({ title: "نجاح", description: editingAdminId ? "تم تحديث المستخدم بنجاح" : "تم إضافة المستخدم بنجاح" })
       setNewAdmin({ name: "", account_number: "", phone_number: "", id_number: "", role: roles[0] || "سكرتير" })
       setIsAddMode(false)
+      setEditingAdminId(null)
       fetchData()
     } catch (error) {
-      toast({ title: "خطأ", description: error instanceof Error ? error.message : "حدث خطأ أثناء الإضافة", variant: "destructive" })
+      toast({ title: "خطأ", description: error instanceof Error ? error.message : editingAdminId ? "حدث خطأ أثناء التعديل" : "حدث خطأ أثناء الإضافة", variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleStartEditAdmin = (user: UserEntry) => {
+    setEditingAdminId(user.id)
+    setNewAdmin({
+      name: String(user.name || ""),
+      account_number: String(user.account_number || ""),
+      phone_number: String(user.phone_number || ""),
+      id_number: String(user.id_number || ""),
+      role: String(user.role || roles[0] || "سكرتير"),
+    })
+    setIsAddMode(true)
   }
 
   const handleDeleteUser = async (userId: string) => {
@@ -380,11 +395,17 @@ export function GlobalAdminsDialog() {
           </Dialog>
 
           {/* Dialog: Add User */}
-          <Dialog open={isAddMode} onOpenChange={setIsAddMode}>
+          <Dialog open={isAddMode} onOpenChange={(open) => {
+            setIsAddMode(open)
+            if (!open) {
+              setEditingAdminId(null)
+              setNewAdmin({ name: "", account_number: "", phone_number: "", id_number: "", role: roles[0] || "سكرتير" })
+            }
+          }}>
             <DialogContent className="sm:max-w-md bg-white border-[#3453a7]/20 font-cairo" dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-xl font-bold text-[#1a2332]">إضافة اداري جديد</DialogTitle>
-                <DialogDescription>أدخل بيانات الإداري والمسمى الوظيفي</DialogDescription>
+                <DialogTitle className="text-xl font-bold text-[#1a2332]">{editingAdminId ? "تعديل بيانات الإداري" : "إضافة اداري جديد"}</DialogTitle>
+                <DialogDescription>{editingAdminId ? "عدّل بيانات الإداري والمسمى الوظيفي" : "أدخل بيانات الإداري والمسمى الوظيفي"}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -422,7 +443,7 @@ export function GlobalAdminsDialog() {
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsAddMode(false)}>إلغاء</Button>
                 <Button onClick={handleAddAdmin} disabled={isSubmitting} className="relative h-10 min-w-[140px] bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
-                  <span className={isSubmitting ? "invisible" : ""}>حفظ</span>
+                  <span className={isSubmitting ? "invisible" : ""}>{editingAdminId ? "حفظ التعديلات" : "حفظ"}</span>
                   {isSubmitting ? (
                     <span className="absolute inset-0 flex items-center justify-center">
                       <SiteLoader size="sm" color="#f8f4ea" />
@@ -460,6 +481,13 @@ export function GlobalAdminsDialog() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleStartEditAdmin(user)}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg text-[#3453a7] hover:bg-[#3453a7]/10 hover:text-[#24428f] transition-colors border border-transparent hover:border-[#bfd0ea]"
+                        title="تعديل بيانات الإداري"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       <div className="w-[160px]">
                         <Select value={user.role} onValueChange={(val) => handleChangeRole(user.id, val)}>
                           <SelectTrigger className="h-9 border-[#3453a7]/30 text-sm w-full">

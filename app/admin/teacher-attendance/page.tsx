@@ -220,13 +220,30 @@ export function TeacherAttendanceContent({
     }
   }
 
+  const formatLateDuration = (totalMinutes: number | null) => {
+    const safeMinutes = Math.max(0, Number(totalMinutes) || 0)
+    const hours = Math.floor(safeMinutes / 60)
+    const minutes = safeMinutes % 60
+
+    if (hours === 0) {
+      return `${minutes} دقيقة`
+    }
+
+    if (minutes === 0) {
+      return hours === 1 ? "ساعة واحدة" : `${hours} ساعات`
+    }
+
+    const hoursLabel = hours === 1 ? "ساعة" : `${hours} ساعات`
+    return `${hoursLabel} ${minutes} دقيقة`
+  }
+
   const renderAttendanceStatus = (record: AttendanceRecord) => {
     if (record.status !== "present") {
       return <span className="text-red-600 font-bold">✗ لم يحضر</span>
     }
 
     if (record.timingCategory === "late") {
-      return <span className="font-bold text-amber-600">متأخر {record.lateMinutes} د</span>
+      return <span className="font-bold text-amber-600">متأخر {formatLateDuration(record.lateMinutes)}</span>
     }
 
     if (record.timingCategory === "early") {

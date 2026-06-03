@@ -366,6 +366,8 @@ export function Header() {
   const [isGlobalRankLoading, setIsGlobalRankLoading] = useState(true);
 
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isStoreOpen, setIsStoreOpen] = useState(true);
+  const [isStoreStatusResolved, setIsStoreStatusResolved] = useState(false);
 
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -439,6 +441,7 @@ export function Header() {
 
   const hasPermission = (key: string) => hasPermissionAccess(userPermissions, key, isFullAccess);
   const canManageSemesters = hasPermission("إنهاء الفصل");
+  const shouldShowStudentStore = userRole === "student" && isStoreStatusResolved && isStoreOpen;
 
   const router = useRouter();
   const pathname = usePathname();
@@ -495,6 +498,41 @@ export function Header() {
       setIsLoginDialogOpen(true);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!isLoggedIn || userRole !== "student") {
+      setIsStoreOpen(true);
+      setIsStoreStatusResolved(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadStoreStatus = async () => {
+      setIsStoreStatusResolved(false);
+      try {
+        const response = await fetch("/api/store/status", { cache: "no-store" });
+        const data = response.ok ? await response.json().catch(() => null) : null;
+        if (!cancelled) {
+          setIsStoreOpen(data?.isOpen !== false);
+        }
+      } catch {
+        if (!cancelled) {
+          setIsStoreOpen(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsStoreStatusResolved(true);
+        }
+      }
+    };
+
+    void loadStoreStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, userRole]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1644,9 +1682,11 @@ export function Header() {
                       <DropdownMenuItem onClick={() => handleNav("/daily-challenge")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
                         <span className="w-full text-right">التحدي اليومي</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleNav("/store")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
-                        <span className="w-full text-right">المتجر</span>
-                      </DropdownMenuItem>
+                      {shouldShowStudentStore ? (
+                        <DropdownMenuItem onClick={() => handleNav("/store")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
+                          <span className="w-full text-right">المتجر</span>
+                        </DropdownMenuItem>
+                      ) : null}
                       <DropdownMenuItem onClick={() => handleNav("/pathways")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
                         <span className="w-full text-right">المسار</span>
                       </DropdownMenuItem>
@@ -1995,11 +2035,13 @@ export function Header() {
                   onClick={() => handleNav("/daily-challenge")}
                   gold={!dailyChallengePlayedToday}
                 />
-                <NavItem
-                  icon={Store}
-                  label="المتجر"
-                  onClick={() => handleNav("/store")}
-                />
+                {shouldShowStudentStore ? (
+                  <NavItem
+                    icon={Store}
+                    label="المتجر"
+                    onClick={() => handleNav("/store")}
+                  />
+                ) : null}
               </div>
             </>
           )}

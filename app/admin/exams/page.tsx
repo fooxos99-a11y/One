@@ -966,7 +966,7 @@ export function ExamsContent({
                     </Select>
                   </div>
                   <div className="space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">أصل النقاط</Label>
+                    <Label className="text-sm font-black text-[#334155]">أصل الدرجة</Label>
                     <Input type="number" min="1" value={settingsForm.maxScore} onChange={(event) => handleSettingsChange("maxScore", event.target.value)} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
                   </div>
                   <div className="space-y-2 text-right">

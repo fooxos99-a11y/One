@@ -1,3 +1,7 @@
+import { getSiteSetting } from "@/lib/site-settings";
+import { DEFAULT_STORE_STATUS_SETTINGS, STORE_STATUS_SETTING_ID } from "@/lib/site-settings-constants";
+import { normalizeStoreStatus } from "@/lib/store-status";
+
 export async function DELETE(request: Request) {
   try {
     const supabase = createClient(
@@ -48,6 +52,11 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(request: Request) {
   try {
     console.log("[store-orders] API called");
+    const storeStatus = normalizeStoreStatus(await getSiteSetting(STORE_STATUS_SETTING_ID, DEFAULT_STORE_STATUS_SETTINGS));
+    if (!storeStatus.isOpen) {
+      return NextResponse.json({ error: "المتجر مغلق حالياً" }, { status: 403 });
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

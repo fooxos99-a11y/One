@@ -138,10 +138,10 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
             id="accountNumber"
             name="accountNumber"
             type="text"
-            placeholder="أدخل رقم الحساب"
+            placeholder={accountNumber ? "" : "أدخل رقم الحساب"}
             value={accountNumber}
             onChange={(e) => setAccountNumber(e.target.value)}
-            className="h-12 border-2 border-gray-200 text-center text-base caret-transparent transition-colors focus:border-[#3453a7] md:h-14 md:text-lg"
+            className="h-12 border-2 border-gray-200 text-center text-base text-[#1a2332] caret-[#3453a7] shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow,color] placeholder:text-slate-400 focus:border-[#3453a7] focus:shadow-[0_0_0_4px_rgba(52,83,167,0.14),0_12px_24px_rgba(52,83,167,0.10)] focus-visible:border-[#3453a7] focus-visible:ring-0 md:h-14 md:text-lg"
             required
             dir="ltr"
           />

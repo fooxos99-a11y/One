@@ -6,16 +6,25 @@ import {
   loadAttendanceSaveGuardianTemplates,
   sendAttendanceSaveGuardianNotification,
 } from "@/lib/attendance-save-notifications"
+import { loadAttendanceAutoSendSettings } from "@/lib/attendance-auto-send-settings"
 import { ensureTeacherScope, isTeacherRole, requireRoles } from "@/lib/auth/guards"
 import { isWhatsAppWorkerReady, readWhatsAppWorkerStatus } from "@/lib/whatsapp-worker-status"
 import {
   applyAttendancePointsAdjustment,
-  calculateTotalEvaluationPoints,
+  calculateEvaluationLevelPoints,
   isEvaluatedAttendance,
   isNonEvaluatedAttendance,
 } from "@/lib/student-attendance"
 import { getOrCreateActiveSemester, isNoActiveSemesterError } from "@/lib/semesters"
 import { getHafizExtraPoints, normalizeHafizExtraPages } from "@/lib/hafiz-extra"
+import { getNextAyahReference, getPageFloatForAyah, SURAHS } from "@/lib/quran-data"
+
+type ReadingContent = {
+  fromSurah?: string | null
+  fromVerse?: string | null
+  toSurah?: string | null
+  toVerse?: string | null
+}
 
 function getKsaDateString() {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -55,17 +64,76 @@ function isMissingStudentHafizExtrasTable(error: unknown) {
   return /student_hafiz_extras/i.test(message) && /does not exist|not exist|relation|table/i.test(message)
 }
 
-function normalizeAutoSendMode(value: unknown): "daily" | "weekly" | "none" {
-  if (value === "weekly" || value === "none") {
-    return value
+function resolveSurahNumber(value: unknown) {
+  const trimmedValue = String(value || "").trim()
+  if (!trimmedValue) return null
+
+  const numericValue = Number(trimmedValue)
+  if (Number.isInteger(numericValue) && numericValue >= 1 && numericValue <= 114) {
+    return numericValue
   }
 
-  return "daily"
+  return SURAHS.find((surah) => surah.name === trimmedValue)?.number || null
 }
 
-function isMissingGuardianReportModeColumn(error: unknown) {
-  const message = String((error as { message?: string } | null)?.message || error || "")
-  return /guardian_report_mode/i.test(message) && /does not exist|not exist|column/i.test(message)
+function calculateReadingContentPages(content?: ReadingContent | null) {
+  const startSurahNumber = resolveSurahNumber(content?.fromSurah)
+  const startVerseNumber = Number(content?.fromVerse) || null
+  const endSurahNumber = resolveSurahNumber(content?.toSurah)
+  const endVerseNumber = Number(content?.toVerse) || null
+
+  if (!startSurahNumber || !endSurahNumber || !Number.isInteger(startVerseNumber) || !Number.isInteger(endVerseNumber)) {
+    return 0
+  }
+
+  const startPage = getPageFloatForAyah(startSurahNumber, startVerseNumber)
+  const nextReference = getNextAyahReference(endSurahNumber, endVerseNumber)
+  const endPage = nextReference
+    ? getPageFloatForAyah(nextReference.surah, nextReference.ayah)
+    : 605
+
+  if (!Number.isFinite(startPage) || !Number.isFinite(endPage) || startPage <= 0 || endPage <= startPage) {
+    return 0
+  }
+
+  return endPage - startPage
+}
+
+function calculateHafizEvaluationPoints(
+  level: string | null | undefined,
+  plannedContent?: ReadingContent | null,
+  actualContent?: ReadingContent | null,
+) {
+  const basePoints = calculateEvaluationLevelPoints(level)
+  const plannedPages = calculateReadingContentPages(plannedContent)
+
+  if (basePoints <= 0 || plannedPages <= 0) {
+    return basePoints
+  }
+
+  const actualPages = calculateReadingContentPages(actualContent)
+  const completionRatio = Math.max(0, Math.min(1, actualPages / plannedPages))
+  return Math.max(0, Math.round(basePoints * completionRatio))
+}
+
+function calculateAttendanceEvaluationPoints(params: {
+  hafizLevel?: string | null
+  tikrarLevel?: string | null
+  samaaLevel?: string | null
+  rabetLevel?: string | null
+  plannedHafizContent?: ReadingContent | null
+  actualHafizContent?: ReadingContent | null
+}) {
+  const hafizPoints = calculateHafizEvaluationPoints(
+    params.hafizLevel,
+    params.plannedHafizContent,
+    params.actualHafizContent,
+  )
+
+  return hafizPoints
+    + calculateEvaluationLevelPoints(params.tikrarLevel)
+    + calculateEvaluationLevelPoints(params.samaaLevel)
+    + calculateEvaluationLevelPoints(params.rabetLevel)
 }
 
 export async function POST(request: NextRequest) {
@@ -110,6 +178,7 @@ export async function POST(request: NextRequest) {
     const activeSemester = await getOrCreateActiveSemester(supabase)
     const absenceTemplates = await getAbsenceNotificationTemplates(supabase)
     const attendanceTemplates = await loadAttendanceSaveGuardianTemplates()
+    const autoSendSettings = await loadAttendanceAutoSendSettings()
     const todayDate = getKsaDateString()
     const effectiveTeacherId = isTeacherRole(session.role) ? session.id : teacher_id
     const hasAnyHafizExtra = students.some((student) => normalizeHafizExtraPages(student?.hafizExtraPages) !== null)
@@ -190,7 +259,7 @@ export async function POST(request: NextRequest) {
     }
     const results = []
     for (const student of students) {
-      const { id: student_id, attendance, evaluation, readingDetails, notes } = student
+      const { id: student_id, attendance, evaluation, readingDetails, plannedReadingDetails, notes } = student
       const studentRow = studentRowsById.get(String(student_id))
       const pointState = studentPointsState.get(String(student_id))
 
@@ -199,7 +268,6 @@ export async function POST(request: NextRequest) {
       }
 
       const status = attendance || "present"
-      const autoSendMode = normalizeAutoSendMode(student?.autoSendMode)
       const isAbsent = isNonEvaluatedAttendance(status)
       const hafiz_level = isAbsent ? "not_completed" : (evaluation?.hafiz || "not_completed")
       const tikrar_level = isAbsent ? "not_completed" : (evaluation?.tikrar || "not_completed")
@@ -208,23 +276,6 @@ export async function POST(request: NextRequest) {
       const hafizExtraPages = isAbsent ? null : normalizeHafizExtraPages(student?.hafizExtraPages)
       const hafizExtraPoints = getHafizExtraPoints(hafizExtraPages)
       const normalizedNotes = typeof notes === "string" && notes.trim() ? notes.trim() : null
-
-      const { error: autoSendModeUpdateError } = await supabase
-        .from("students")
-        .update({ guardian_report_mode: autoSendMode })
-        .eq("id", student_id)
-
-      if (autoSendModeUpdateError) {
-        return NextResponse.json(
-          {
-            error: isMissingGuardianReportModeColumn(autoSendModeUpdateError)
-              ? "عمود وضع الإرسال التلقائي غير موجود بعد. نفذ ملف add_guardian_report_mode.sql ثم أعد المحاولة."
-              : "فشل في حفظ وضع الإرسال التلقائي",
-            student_id,
-          },
-          { status: isMissingGuardianReportModeColumn(autoSendModeUpdateError) ? 503 : 500 },
-        )
-      }
 
       console.log(`[DEBUG][API] الطالب: ${student_id}, الحضور: ${status}, التقييمات المدخلة:`, evaluation)
       console.log(`[DEBUG][API] القيم التي سيتم حفظها: hafiz=${hafiz_level}, tikrar=${tikrar_level}, samaa=${samaa_level}, rabet=${rabet_level}`)
@@ -253,7 +304,7 @@ export async function POST(request: NextRequest) {
         // نحسب صافي النقاط مرة واحدة لتجنب جلب رصيد الطالب أكثر من مرة.
         const { data: oldEvaluations, error: oldEvaluationError } = await supabase
           .from("evaluations")
-          .select("hafiz_level, tikrar_level, samaa_level, rabet_level, created_at")
+          .select("hafiz_level, tikrar_level, samaa_level, rabet_level, hafiz_from_surah, hafiz_from_verse, hafiz_to_surah, hafiz_to_verse, created_at")
           .eq("attendance_record_id", existingRecord.id)
           .order("created_at", { ascending: true })
 
@@ -270,11 +321,18 @@ export async function POST(request: NextRequest) {
 
         if (oldEvaluation) {
           oldPoints = applyAttendancePointsAdjustment(
-            calculateTotalEvaluationPoints({
-              hafiz_level: oldEvaluation.hafiz_level,
-              tikrar_level: oldEvaluation.tikrar_level,
-              samaa_level: oldEvaluation.samaa_level,
-              rabet_level: oldEvaluation.rabet_level,
+            calculateAttendanceEvaluationPoints({
+              hafizLevel: oldEvaluation.hafiz_level,
+              tikrarLevel: oldEvaluation.tikrar_level,
+              samaaLevel: oldEvaluation.samaa_level,
+              rabetLevel: oldEvaluation.rabet_level,
+              plannedHafizContent: plannedReadingDetails?.hafiz || readingDetails?.hafiz,
+              actualHafizContent: {
+                fromSurah: oldEvaluation.hafiz_from_surah,
+                fromVerse: oldEvaluation.hafiz_from_verse,
+                toSurah: oldEvaluation.hafiz_to_surah,
+                toVerse: oldEvaluation.hafiz_to_verse,
+              },
             }),
             existingRecord?.status,
           )
@@ -345,11 +403,13 @@ export async function POST(request: NextRequest) {
       // إضافة التقييم الجديد وحساب النقاط فقط إذا لم يكن غائب أو مستأذن
       if (isEvaluatedAttendance(status)) {
         const totalPoints = applyAttendancePointsAdjustment(
-          calculateTotalEvaluationPoints({
-            hafiz_level,
-            tikrar_level,
-            samaa_level,
-            rabet_level,
+          calculateAttendanceEvaluationPoints({
+            hafizLevel: hafiz_level,
+            tikrarLevel: tikrar_level,
+            samaaLevel: samaa_level,
+            rabetLevel: rabet_level,
+            plannedHafizContent: plannedReadingDetails?.hafiz || readingDetails?.hafiz,
+            actualHafizContent: readingDetails?.hafiz,
           }),
           status,
         )
@@ -443,7 +503,7 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        if (autoSendMode === "daily") {
+        if (autoSendSettings.mode === "daily") {
           const whatsappResult = await sendAttendanceSaveGuardianNotification({
             supabase,
             studentId: student_id,
@@ -513,7 +573,7 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        if (autoSendMode === "daily") {
+        if (autoSendSettings.mode === "daily") {
           const whatsappResult = await sendAttendanceSaveGuardianNotification({
             supabase,
             studentId: student_id,

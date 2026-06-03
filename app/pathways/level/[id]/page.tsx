@@ -1,6 +1,7 @@
 
 "use client";
 import { SiteLoader } from "@/components/ui/site-loader";
+import { useVerifiedRoleAccess } from "@/hooks/use-verified-role-access"
 // دالة لتحويل رقم المستوى إلى نص عربي (خارج الكومبوننت)
 function getLevelTitle(levelId: number) {
   const titles = [
@@ -45,6 +46,7 @@ export default function LevelPage() {
   const params = useParams();
   const router = useRouter();
   const levelId = params?.id ? Number(params.id) : 1;
+  const { isLoading: authLoading, isAuthorized, user } = useVerifiedRoleAccess(["student"])
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,6 +63,12 @@ export default function LevelPage() {
   const [lastAwardedPoints, setLastAwardedPoints] = useState<number>(0);
   // تحقق إذا كان الطالب أكمل هذا المستوى مسبقاً
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthorized || !user) {
+      setIsLoading(false)
+      return
+    }
+
     const checkCompletion = async () => {
       const currentUserStr = localStorage.getItem("currentUser");
       if (!currentUserStr) return;
@@ -109,14 +117,23 @@ export default function LevelPage() {
       }
     };
     checkCompletion();
-  }, [levelId]);
+  }, [authLoading, isAuthorized, levelId, router, user]);
 
   useEffect(() => {
+    if (authLoading) {
+      return
+    }
+
+    if (!isAuthorized || !user) {
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true);
     setError("");
     const currentUserStr = localStorage.getItem("currentUser");
     const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
-    const halaqah = currentUser?.halaqah;
+    const halaqah = user.halaqah || currentUser?.halaqah;
 
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,18 +178,26 @@ export default function LevelPage() {
       }
     };
     Promise.all([fetchContents(), fetchQuestions()]).finally(() => setIsLoading(false));
-  }, [levelId]);
+  }, [authLoading, isAuthorized, levelId, user]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf9]">
+        <SiteLoader size="lg" />
+      </div>
+    )
+  }
+
+  if (!isAuthorized) {
+    return null
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#f7e9d7] to-[#e3f6f5] flex flex-col items-center justify-center p-4">
       <h1 className="text-5xl font-extrabold mb-10 text-center text-[#20335f] drop-shadow-lg">{getLevelTitle(levelId)}</h1>
       <div className="w-full flex justify-center items-start">
         <div className="w-full max-w-2xl">
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <SiteLoader size="lg" color="#3453a7" />
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="bg-red-100 text-red-700 rounded-lg p-4 text-center font-bold shadow">{error}</div>
         ) : (
           <>

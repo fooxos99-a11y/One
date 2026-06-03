@@ -145,7 +145,13 @@ function formatTodayScheduledExamText(schedules: ExamScheduleRow[]) {
   return parts.join(" ، ")
 }
 
-export function GlobalStudentExamsDialog() {
+export function GlobalStudentExamsDialog({
+  forcedOpen = false,
+  onCloseComplete,
+}: {
+  forcedOpen?: boolean
+  onCloseComplete?: () => void
+} = {}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -170,13 +176,18 @@ export function GlobalStudentExamsDialog() {
   const [failedExamActionForm, setFailedExamActionForm] = useState<FailedExamActionForm>(DEFAULT_FAILED_EXAM_ACTION_FORM)
 
   useEffect(() => {
+    if (forcedOpen) {
+      setIsOpen(true)
+      return
+    }
+
     if (searchParams?.get("action") === "student-exams") {
       setIsOpen(true)
       return
     }
 
     setIsOpen(false)
-  }, [searchParams])
+  }, [forcedOpen, searchParams])
 
   useEffect(() => {
     async function bootstrap() {
@@ -487,6 +498,11 @@ export function GlobalStudentExamsDialog() {
   const handleDialogChange = (open: boolean) => {
     setIsOpen(open)
     if (!open) {
+      if (forcedOpen) {
+        onCloseComplete?.()
+        return
+      }
+
       const currentSearchParams = new URLSearchParams(searchParams?.toString() || "")
       currentSearchParams.delete("action")
       const query = currentSearchParams.toString()

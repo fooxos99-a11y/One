@@ -5,6 +5,7 @@ export type AttendanceSaveNotificationTemplates = {
   late: string
   absent: string
   excused: string
+  weekly: string
 }
 
 const DEFAULT_EVALUATED_ATTENDANCE_TEMPLATE = [
@@ -27,6 +28,14 @@ export const DEFAULT_ATTENDANCE_SAVE_NOTIFICATION_TEMPLATES: AttendanceSaveNotif
   late: DEFAULT_EVALUATED_ATTENDANCE_TEMPLATE,
   absent: "تم حفظ تحضير الطالب {name} في حلقة {halaqah} بتاريخ {date} بحالة {status}.",
   excused: "تم حفظ تحضير الطالب {name} في حلقة {halaqah} بتاريخ {date} بحالة {status}.",
+  weekly: [
+    "نفيدكم بملخص السجل الأسبوعي للطالب {name} في حلقة {halaqah}.",
+    "الفترة: من {week_start} إلى {week_end}",
+    "",
+    "{week_days}",
+    "",
+    "نشكر لكم متابعتكم وحرصكم",
+  ].join("\n"),
 }
 
 type TemplateParams = {
@@ -40,6 +49,9 @@ type TemplateParams = {
   tikrar?: string
   samaa?: string
   rabet?: string
+  weekStart?: string
+  weekEnd?: string
+  weekDays?: string
 }
 
 export function normalizeAttendanceSaveNotificationTemplates(value: unknown): AttendanceSaveNotificationTemplates {
@@ -61,6 +73,7 @@ export function normalizeAttendanceSaveNotificationTemplates(value: unknown): At
     late: normalizeEvaluatedTemplate(candidate.late),
     absent: typeof candidate.absent === "string" && candidate.absent.trim() ? candidate.absent.trim() : DEFAULT_ATTENDANCE_SAVE_NOTIFICATION_TEMPLATES.absent,
     excused: typeof candidate.excused === "string" && candidate.excused.trim() ? candidate.excused.trim() : DEFAULT_ATTENDANCE_SAVE_NOTIFICATION_TEMPLATES.excused,
+    weekly: typeof candidate.weekly === "string" && candidate.weekly.trim() ? candidate.weekly.trim() : DEFAULT_ATTENDANCE_SAVE_NOTIFICATION_TEMPLATES.weekly,
   }
 }
 
@@ -79,4 +92,7 @@ export function fillAttendanceSaveNotificationTemplate(template: string, params:
     .replaceAll("{samaa_evaluation}", params.samaa || "-")
     .replaceAll("{rabet}", params.rabet || "-")
     .replaceAll("{rabet_evaluation}", params.rabet || "-")
+    .replaceAll("{week_start}", params.weekStart || params.date)
+    .replaceAll("{week_end}", params.weekEnd || params.date)
+    .replaceAll("{week_days}", params.weekDays || "-")
 }

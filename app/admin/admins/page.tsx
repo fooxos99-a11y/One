@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useConfirmDialog, useAlertDialog } from "@/hooks/use-confirm-dialog"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
-import { Plus, ShieldCheck, Trash2, User, X } from "lucide-react"
+import { Edit2, Plus, ShieldCheck, Trash2, User, X } from "lucide-react"
 
 const DEFAULT_ROLES = ["سكرتير", "مشرف تعليمي", "مشرف تربوي", "مشرف برامج"]
 
@@ -63,6 +63,7 @@ export function AdminsManagementContent({
   const [roles, setRoles] = useState<string[]>(DEFAULT_ROLES)
   const [permissions, setPermissions] = useState<PermissionsMap>({})
   const [form, setForm] = useState<AdminUserForm>(EMPTY_FORM)
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [newRoleName, setNewRoleName] = useState("")
   const [activeInlineView, setActiveInlineView] = useState<"role" | "admin" | null>(null)
 
@@ -128,10 +129,29 @@ export function AdminsManagementContent({
 
   const resetAdminForm = () => {
     setForm({ ...EMPTY_FORM, role: roles[0] || DEFAULT_ROLES[0] })
+    setEditingUser(null)
   }
 
   const closeInlineView = () => {
+    resetAdminForm()
     setActiveInlineView(null)
+  }
+
+  const handleStartAddAdmin = () => {
+    resetAdminForm()
+    setActiveInlineView("admin")
+  }
+
+  const handleStartEditUser = (user: AdminUser) => {
+    setEditingUser(user)
+    setForm({
+      name: String(user.name || ""),
+      account_number: String(user.account_number || ""),
+      phone_number: String(user.phone_number || ""),
+      id_number: String(user.id_number || ""),
+      role: String(user.role || roles[0] || DEFAULT_ROLES[0]),
+    })
+    setActiveInlineView("admin")
   }
 
   const handleSaveUser = async () => {
@@ -143,9 +163,10 @@ export function AdminsManagementContent({
     setIsSubmittingUser(true)
     try {
       const response = await fetch("/api/admin-users", {
-        method: "POST",
+        method: editingUser ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: editingUser?.id,
           name: form.name,
           account_number: form.account_number,
           phone_number: form.phone_number,
@@ -165,7 +186,7 @@ export function AdminsManagementContent({
       await fetchData()
     } catch (error) {
       console.error("[admins] handleSaveUser:", error)
-      await showAlert("حدث خطأ أثناء حفظ المستخدم", "خطأ")
+      await showAlert(editingUser ? "حدث خطأ أثناء تعديل المستخدم" : "حدث خطأ أثناء حفظ المستخدم", "خطأ")
     } finally {
       setIsSubmittingUser(false)
     }
@@ -310,7 +331,7 @@ export function AdminsManagementContent({
                   <DropdownMenuItem onClick={() => setActiveInlineView("role")} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
                     إضافة مسمى
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveInlineView("admin")} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
+                  <DropdownMenuItem onClick={handleStartAddAdmin} className="cursor-pointer justify-end rounded-[1rem] px-4 py-3 text-right font-bold text-[#1f2a3d] focus:bg-[#f5f8fd] focus:text-[#20335f]">
                     إضافة إداري
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -397,9 +418,9 @@ export function AdminsManagementContent({
 
                 <div className="px-6 py-4 pt-4 md:px-10 md:pb-8">
                   <Button onClick={handleSaveUser} disabled={!form.name.trim() || !form.account_number.trim() || !form.role.trim() || isSubmittingUser} className="h-14 w-full rounded-[1.25rem] border-none bg-[#3453a7] text-xl font-bold text-white hover:bg-[#24428f] disabled:cursor-not-allowed disabled:bg-[#dbe3f3] disabled:text-[#8a97b5] disabled:shadow-none disabled:hover:bg-[#dbe3f3] disabled:opacity-100">
-                    {isSubmittingUser ? "جاري الحفظ..." : "حفظ"}
+                    {isSubmittingUser ? "جاري الحفظ..." : editingUser ? "حفظ التعديلات" : "حفظ"}
                   </Button>
-                  <button type="button" onClick={() => { resetAdminForm(); closeInlineView() }} className="mt-4 w-full text-center text-sm font-semibold text-[#6c7d95] transition-colors hover:text-[#3453a7]">
+                  <button type="button" onClick={closeInlineView} className="mt-4 w-full text-center text-sm font-semibold text-[#6c7d95] transition-colors hover:text-[#3453a7]">
                     رجوع
                   </button>
                 </div>
@@ -442,6 +463,14 @@ export function AdminsManagementContent({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleStartEditUser(user)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#d8e5fb] text-[#3453a7] hover:bg-[#f5f8ff] hover:text-[#24428f] hover:border-[#bfd0ea] text-sm font-medium transition-colors"
+                          title="تعديل بيانات الإداري"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          تعديل
+                        </button>
                         <button
                           onClick={() => void handleDeleteUser(user)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 hover:border-red-300 text-sm font-medium transition-colors"

@@ -21,6 +21,9 @@ export const DEFAULT_EXAM_PORTION_SETTINGS = {
 export const RECITATION_DAY_GRADING_SETTINGS_ID = "recitation_day_grading_settings"
 export const GOALS_SECTION_SETTINGS_ID = "goals_section_settings"
 export const SITE_DESIGN_SETTINGS_ID = "site_design_settings"
+export const STORE_STATUS_SETTING_ID = "store_status"
+export const ATTENDANCE_AUTO_SEND_SETTINGS_ID = "attendance_auto_send_settings"
+export const ATTENDANCE_WEEKLY_REPORT_LOG_SETTING_ID = "attendance_weekly_report_log"
 
 export const DEFAULT_RECITATION_DAY_GRADING_SETTINGS = {
 	baseScore: 100,
@@ -70,4 +73,18 @@ export const DEFAULT_SITE_DESIGN_SETTINGS = {
 	pageTop: "#eef3fb",
 	pageMiddle: "#e8eef8",
 	pageBottom: "#ffffff",
+} as const
+
+export const DEFAULT_STORE_STATUS_SETTINGS = {
+	isOpen: true,
+} as const
+
+export const DEFAULT_ATTENDANCE_AUTO_SEND_SETTINGS = {
+	mode: "daily",
+	weeklySendDay: "thursday",
+	weeklySendTime: "22:00",
+} as const
+
+export const DEFAULT_ATTENDANCE_WEEKLY_REPORT_LOG = {
+	entries: [],
 } as const

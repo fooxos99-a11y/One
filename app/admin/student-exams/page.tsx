@@ -8,12 +8,13 @@ export default async function AdminStudentExamsPage({
   }>
 }) {
   const resolvedSearchParams = await searchParams
+  const target = "/admin/dashboard?action=student-exams"
   const params = new URLSearchParams()
-  params.set("action", "student-exams")
+  params.set("target", target)
 
   if (resolvedSearchParams?.embedded === "1") {
     params.set("embedded", "1")
   }
 
-  redirect(`/admin/exams?${params.toString()}`)
+  redirect(`/admin/dashboard?${params.toString()}`)
 }

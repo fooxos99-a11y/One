@@ -731,14 +731,14 @@ export function PathwaysContent({
               <h1 className="text-3xl font-black text-[#1a2332]">إدارة المسار</h1>
               {displayMode !== "inline" ? (
               <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <Button type="button" onClick={() => { loadLevelResults(); setShowResultsModal(true); }} className="h-11 w-full rounded-2xl border border-[#3453a7] bg-[#3453a7] px-6 text-sm font-black text-white shadow-none hover:bg-[#2c478f] sm:w-auto">
+                  نتائج المسار
+                </Button>
                 <Button type="button" onClick={openAddLevelModal} className="h-11 w-full rounded-2xl border border-[#3453a7] bg-[#3453a7] px-6 text-sm font-black text-white shadow-none hover:bg-[#2c478f] sm:w-auto">
                   إضافة
                 </Button>
                 <Button type="button" onClick={() => setShowNotificationTemplateModal(true)} className="inline-flex h-12 w-full items-center justify-center rounded-full border border-[#d8e5fb] bg-white px-5 text-sm font-bold text-[#3453a7] shadow-[0_10px_30px_rgba(52,83,167,0.08)] transition-all hover:bg-[#f6f9ff] sm:w-auto">
                   القالب
-                </Button>
-                <Button type="button" onClick={() => { loadLevelResults(); setShowResultsModal(true); }} className="h-11 w-full rounded-2xl border border-[#3453a7] bg-[#3453a7] px-6 text-sm font-black text-white shadow-none hover:bg-[#2c478f] sm:w-auto">
-                  نتائج المسار
                 </Button>
               </div>
               ) : null}

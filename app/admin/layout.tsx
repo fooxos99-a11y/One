@@ -37,7 +37,6 @@ const DASHBOARD_ONLY_ADMIN_PATHS = new Set([
 const DASHBOARD_TARGET_REDIRECTS: Record<string, string> = {
 	"/admin/exams-settings": "/admin/exams",
 	"/admin/pathways-results": "/admin/pathways",
-	"/admin/recitation-day/archive": "/admin/recitation-day",
 	"/admin/student-reports": "/admin/reports",
 	"/admin/whatsapp-qr": "/admin/whatsapp-send",
 	"/admin/whatsapp-replies": "/admin/whatsapp-send",

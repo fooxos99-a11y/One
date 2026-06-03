@@ -983,11 +983,8 @@ export function StatisticsContent({
                       className="group relative overflow-hidden rounded-[30px] border border-[#d9e4f6] bg-[linear-gradient(145deg,#ffffff_0%,#f4f8ff_58%,#eef5ff_100%)] px-5 py-5 text-right shadow-[0_18px_45px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1.5 hover:border-[#bfd3f5] hover:shadow-[0_26px_50px_rgba(52,83,167,0.12)] sm:px-6 sm:py-6"
                     >
                       <div className="pointer-events-none absolute inset-x-6 top-0 h-24 rounded-b-[32px] bg-[radial-gradient(circle_at_top,rgba(79,115,209,0.18),rgba(79,115,209,0))] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
-                      <div className="relative rounded-[24px] border border-white/80 bg-white/80 px-4 py-5 backdrop-blur-sm transition duration-300 group-hover:bg-white sm:px-5 sm:py-6">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef4ff] text-[#3453a7] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition duration-300 group-hover:bg-[#3453a7] group-hover:text-white">
-                            <Trophy className="h-5 w-5" />
-                          </span>
+                      <div className="relative">
+                        <div className="mb-4 flex items-center justify-end gap-3">
                           <span className="rounded-full border border-[#d9e4f6] bg-[#f8fbff] px-3 py-1 text-[11px] font-extrabold text-[#5b6f93] transition duration-300 group-hover:border-[#c8d9f5] group-hover:text-[#3453a7]">
                             عرض التقرير
                           </span>

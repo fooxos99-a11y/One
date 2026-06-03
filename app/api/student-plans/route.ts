@@ -4,6 +4,7 @@ import { ensureStudentAccess, requireRoles } from "@/lib/auth/guards"
 import {
   SURAHS,
   TOTAL_MUSHAF_PAGES,
+  calculateCompletedPlanPagesForPlan,
   calculatePreviousMemorizedPages,
   getContiguousCompletedJuzRange,
   getAdjustedPlanPreviewRange,
@@ -128,16 +129,58 @@ function hasCompletedMemorization(record: any) {
 function hasCompletedReview(record: any) {
   if (!isEvaluatedAttendance(record.status)) return false
 
-  const evaluations = Array.isArray(record.evaluations)
+  const latestEvaluation = getLatestEvaluation(record)
+  if (!latestEvaluation) return false
+
+  return ADVANCING_MEMORIZATION_LEVELS.includes(latestEvaluation?.samaa_level ?? "")
+}
+
+function getLatestEvaluation(record: any) {
+  const evaluations = Array.isArray(record?.evaluations)
     ? record.evaluations
-    : record.evaluations
+    : record?.evaluations
       ? [record.evaluations]
       : []
 
-  if (evaluations.length === 0) return false
+  return evaluations.length > 0 ? evaluations[evaluations.length - 1] : null
+}
 
-  const latestEvaluation = evaluations[evaluations.length - 1]
-  return ADVANCING_MEMORIZATION_LEVELS.includes(latestEvaluation?.samaa_level ?? "")
+function getTrackedMemorizationRange(record: any) {
+  if (!isEvaluatedAttendance(record?.status)) return null
+
+  const latestEvaluation = getLatestEvaluation(record)
+  const startSurahNumber = resolveSurahNumber(latestEvaluation?.hafiz_from_surah)
+  const startVerseNumber = Number(latestEvaluation?.hafiz_from_verse) || 1
+  const endSurahNumber = resolveSurahNumber(latestEvaluation?.hafiz_to_surah)
+  const endVerseNumber = Number(latestEvaluation?.hafiz_to_verse) || null
+
+  if (!startSurahNumber || !endSurahNumber || !Number.isInteger(startVerseNumber) || !Number.isInteger(endVerseNumber)) {
+    return null
+  }
+
+  return {
+    startSurahNumber,
+    startVerseNumber,
+    endSurahNumber,
+    endVerseNumber,
+  }
+}
+
+function calculateTrackedMemorizationPages(record: any) {
+  const range = getTrackedMemorizationRange(record)
+  if (!range) return 0
+
+  const startPage = getPageFloatForAyah(range.startSurahNumber, range.startVerseNumber)
+  const nextReference = getNextAyahReference(range.endSurahNumber, range.endVerseNumber)
+  const endPage = nextReference
+    ? getPageFloatForAyah(nextReference.surah, nextReference.ayah)
+    : TOTAL_MUSHAF_PAGES + 1
+
+  if (!Number.isFinite(startPage) || !Number.isFinite(endPage) || startPage <= 0 || endPage <= startPage) {
+    return 0
+  }
+
+  return endPage - startPage
 }
 
 function getScheduledStudyDates(startDate: string, maxSessions: number, endDate = getSaudiDateString()) {
@@ -457,27 +500,8 @@ function getAttendanceMemorizedRanges(records: any[]) {
         return []
       }
 
-      const evaluations = Array.isArray(record.evaluations)
-        ? record.evaluations
-        : record.evaluations
-          ? [record.evaluations]
-          : []
-      const latestEvaluation = evaluations[evaluations.length - 1]
-      const startSurahNumber = resolveSurahNumber(latestEvaluation?.hafiz_from_surah)
-      const startVerseNumber = Number(latestEvaluation?.hafiz_from_verse) || 1
-      const endSurahNumber = resolveSurahNumber(latestEvaluation?.hafiz_to_surah)
-      const endVerseNumber = Number(latestEvaluation?.hafiz_to_verse) || null
-
-      if (!startSurahNumber || !endSurahNumber || !Number.isInteger(startVerseNumber) || !Number.isInteger(endVerseNumber)) {
-        return []
-      }
-
-      return [{
-        startSurahNumber,
-        startVerseNumber,
-        endSurahNumber,
-        endVerseNumber,
-      }]
+      const trackedRange = getTrackedMemorizationRange(record)
+      return trackedRange ? [trackedRange] : []
     }),
   )
 }
@@ -531,21 +555,26 @@ function buildStudentPlanSummary(
     ? getScheduledStudyDates(plan.start_date, plan.total_days || 0)
     : []
 
-  const passingRecords = filteredAttendanceRecords.filter(hasCompletedMemorization)
-  const sessionProgress = getScheduledSessionProgress(passingRecords, scheduledDates)
+  const memorizationProgressRecords = filteredAttendanceRecords.filter((record) => Boolean(getTrackedMemorizationRange(record)))
+  const sessionProgress = getScheduledSessionProgress(memorizationProgressRecords, scheduledDates)
   const completedDays = sessionProgress.completedDays
   const completedRecords = sessionProgress.completedRecords
   const completedSessionIndices = sessionProgress.completedSessionIndices
   const reviewCompletedDays = filteredAttendanceRecords.filter(hasCompletedReview).length
-  const hafizExtraPages = Math.min(
-    Number(plan.total_pages) || 0,
-    getStudentHafizExtraPages(hafizExtraRows, plan.start_date),
+  const recordedMemorizationPages = completedRecords.reduce(
+    (sum, record) => sum + calculateTrackedMemorizationPages(record),
+    0,
   )
-  const baseCompletedPages = Math.min(
-    Number(plan.total_pages) || 0,
-    completedDays * (Number(plan.daily_pages) || 0),
+  const manualExtraPages = getStudentHafizExtraPages(hafizExtraRows, plan.start_date)
+  const baseCompletedPages = calculateCompletedPlanPagesForPlan(plan, completedDays, 0)
+  const hafizExtraPages = Math.max(
+    -baseCompletedPages,
+    Math.min(
+      Number(plan.total_pages) || 0,
+      recordedMemorizationPages + manualExtraPages - baseCompletedPages,
+    ),
   )
-  const effectiveCompletedPages = Math.min(Number(plan.total_pages) || 0, baseCompletedPages + hafizExtraPages)
+  const effectiveCompletedPages = Math.max(0, Math.min(Number(plan.total_pages) || 0, baseCompletedPages + hafizExtraPages))
   const progressPercent = Number(plan.total_pages) > 0
     ? Math.min(Math.round((effectiveCompletedPages / Number(plan.total_pages)) * 100), 100)
     : 0
@@ -636,7 +665,7 @@ export async function GET(request: Request) {
           .order("created_at", { ascending: false }),
         supabase
           .from("attendance_records")
-          .select("student_id, id, date, status, is_compensation, created_at, evaluations(hafiz_level, tikrar_level, samaa_level, rabet_level)")
+          .select("student_id, id, date, status, is_compensation, created_at, evaluations(hafiz_level, hafiz_from_surah, hafiz_from_verse, hafiz_to_surah, hafiz_to_verse, tikrar_level, samaa_level, rabet_level)")
           .in("student_id", requestedStudentIds)
           .eq("semester_id", activeSemester.id)
           .order("date", { ascending: true }),
@@ -763,7 +792,7 @@ export async function GET(request: Request) {
       // جلب سجلات الحضور مع تقييماتها (join مع evaluations)
       let attQuery = supabase
         .from("attendance_records")
-        .select("id, date, status, is_compensation, created_at, evaluations(hafiz_level, tikrar_level, samaa_level, rabet_level)")
+        .select("id, date, status, is_compensation, created_at, evaluations(hafiz_level, hafiz_from_surah, hafiz_from_verse, hafiz_to_surah, hafiz_to_verse, tikrar_level, samaa_level, rabet_level)")
         .eq("student_id", studentId)
         .eq("semester_id", activeSemester.id)
         .order("date", { ascending: true })

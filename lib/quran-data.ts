@@ -1051,7 +1051,7 @@ export function calculateCompletedPlanPages(
   return Math.min(totalPages, completedDays * dailyPages)
 }
 
-function calculateCompletedPlanPagesForPlan(plan: {
+export function calculateCompletedPlanPagesForPlan(plan: {
   total_pages?: number | null
   daily_pages?: number | null
   start_surah_number?: number | null
@@ -1088,7 +1088,7 @@ function calculateCompletedPlanPagesForPlan(plan: {
     firstSessionPages,
   )
 
-  return Math.min(totalPages, completedPages + normalizeProgressExtraPages(extraPages))
+  return Math.max(0, Math.min(totalPages, completedPages + normalizeProgressExtraPages(extraPages)))
 }
 
 export function calculatePreviousMemorizedPages(plan: {
@@ -2020,7 +2020,7 @@ export function getPlanSessionContent(plan: SessionPlanBounds, sessionNum: numbe
   }
 
   const sessionWindow = getTraversalSessionWindow(memorizedSegments, totalPages, dailyPages, sessionNum)
-  const shiftedOffset = sessionWindow.offset + normalizeProgressExtraPages(extraConsumedPages)
+  const shiftedOffset = Math.max(0, sessionWindow.offset + normalizeProgressExtraPages(extraConsumedPages))
 
   if (shiftedOffset >= totalPages || sessionWindow.size <= 0) {
     return null
@@ -2227,7 +2227,7 @@ function getTraversalSessionWindow(
 
 function normalizeProgressExtraPages(extraPages?: number | null) {
   const numericValue = Number(extraPages) || 0
-  return numericValue > 0 ? numericValue : 0
+  return numericValue
 }
 
 function getPlanContentFromTraversalSegments(
@@ -2715,8 +2715,9 @@ function getWeeklyDistributedReviewContent(
 }
 
 function getLegacyPlanSupportSessionContent(plan: SessionPlanBounds, activeDayNum: number, reviewCompletedDays: number, hafizExtraPages?: number | null): PlanSupportSessionContent {
+  const totalPlanPages = resolvePlanTotalPages(plan)
   const completedPlanPages = calculateCompletedPlanPages(
-    resolvePlanTotalPages(plan),
+    totalPlanPages,
     Number(plan.daily_pages) || 0,
     Math.max(0, activeDayNum - 1),
     getTraversalFirstSessionPages(
@@ -2729,9 +2730,10 @@ function getLegacyPlanSupportSessionContent(plan: SessionPlanBounds, activeDayNu
       Number(plan.daily_pages) || 0,
     ),
   ) + normalizeProgressExtraPages(hafizExtraPages)
+  const normalizedCompletedPlanPages = Math.max(0, Math.min(totalPlanPages, completedPlanPages))
 
   const previousRanges = getPreviousMemorizedRanges(plan)
-  const completedPlanRanges = getCompletedPlanMemorizedRanges(plan, completedPlanPages)
+  const completedPlanRanges = getCompletedPlanMemorizedRanges(plan, normalizedCompletedPlanPages)
   const filteredRanges = excludeJuzsFromAyahRanges([...previousRanges, ...completedPlanRanges], plan.current_juzs)
   const memorizedSegments = getMergedMemorizedPageSegments(filteredRanges)
   const totalMemorizedPages = getTotalMemorizedSequencePages(memorizedSegments)
@@ -2776,8 +2778,9 @@ export function getPlanSupportSessionContent(plan: SessionPlanBounds, completedD
     return getLegacyPlanSupportSessionContent(plan, activeDayNum, normalizedReviewCompletedDays, hafizExtraPages)
   }
 
+  const totalPlanPages = resolvePlanTotalPages(plan)
   const completedPlanPages = calculateCompletedPlanPages(
-    resolvePlanTotalPages(plan),
+    totalPlanPages,
     Number(plan.daily_pages) || 0,
     Math.max(0, activeDayNum - 1),
     getTraversalFirstSessionPages(
@@ -2790,9 +2793,10 @@ export function getPlanSupportSessionContent(plan: SessionPlanBounds, completedD
       Number(plan.daily_pages) || 0,
     ),
   ) + normalizeProgressExtraPages(hafizExtraPages)
+  const normalizedCompletedPlanPages = Math.max(0, Math.min(totalPlanPages, completedPlanPages))
 
   const previousRanges = getPreviousMemorizedRanges(plan)
-  const completedPlanRanges = getCompletedPlanMemorizedRanges(plan, completedPlanPages)
+  const completedPlanRanges = getCompletedPlanMemorizedRanges(plan, normalizedCompletedPlanPages)
   const filteredRanges = excludeJuzsFromAyahRanges([...previousRanges, ...completedPlanRanges], plan.current_juzs)
   const memorizedSegments = getMergedMemorizedPageSegments(filteredRanges)
   const totalMemorizedPages = getTotalMemorizedSequencePages(memorizedSegments)

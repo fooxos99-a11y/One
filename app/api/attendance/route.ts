@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { loadAttendanceAutoSendSettings } from "@/lib/attendance-auto-send-settings"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureStudentAccess, ensureTeacherScope, isTeacherRole, requireRoles } from "@/lib/auth/guards"
 import { getAbsenceNotificationTemplates, syncAbsenceNotification } from "@/lib/absence-notifications"
@@ -271,6 +272,7 @@ export async function POST(request: NextRequest) {
 
     const effectiveTeacherId = isTeacherRole(session.role) ? session.id : teacher_id
     const absenceTemplates = await getAbsenceNotificationTemplates(supabase)
+    const autoSendSettings = await loadAttendanceAutoSendSettings()
 
     // Get today's date in YYYY-MM-DD format (Asia/Riyadh timezone)
     const todayDate = getKsaDateString()
@@ -412,13 +414,15 @@ export async function POST(request: NextRequest) {
     })
 
     if (!isEvaluatedAttendance(normalizedStatus)) {
-      await sendAttendanceSaveGuardianNotification({
-        supabase,
-        studentId: student_id,
-        date: todayDate,
-        status: normalizedStatus,
-        performedByUserId: session.id,
-      })
+      if (autoSendSettings.mode === "daily") {
+        await sendAttendanceSaveGuardianNotification({
+          supabase,
+          studentId: student_id,
+          date: todayDate,
+          status: normalizedStatus,
+          performedByUserId: session.id,
+        })
+      }
 
       return NextResponse.json({
         success: true,
@@ -555,25 +559,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      await sendAttendanceSaveGuardianNotification({
-        supabase,
-        studentId: student_id,
-        date: todayDate,
-        status: normalizedStatus,
-        performedByUserId: session.id,
-        evaluation: {
-          hafiz: hafiz_level,
-          tikrar: tikrar_level,
-          samaa: samaa_level,
-          rabet: rabet_level,
-        },
-        hafizAmount: buildHafizAmountLabel({
-          fromSurah: hafiz_from_surah,
-          fromVerse: hafiz_from_verse,
-          toSurah: hafiz_to_surah,
-          toVerse: hafiz_to_verse,
-        }),
-      })
+      if (autoSendSettings.mode === "daily") {
+        await sendAttendanceSaveGuardianNotification({
+          supabase,
+          studentId: student_id,
+          date: todayDate,
+          status: normalizedStatus,
+          performedByUserId: session.id,
+          evaluation: {
+            hafiz: hafiz_level,
+            tikrar: tikrar_level,
+            samaa: samaa_level,
+            rabet: rabet_level,
+          },
+          hafizAmount: buildHafizAmountLabel({
+            fromSurah: hafiz_from_surah,
+            fromVerse: hafiz_from_verse,
+            toSurah: hafiz_to_surah,
+            toVerse: hafiz_to_verse,
+          }),
+        })
+      }
 
       return NextResponse.json({
         success: true,

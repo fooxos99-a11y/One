@@ -7,12 +7,11 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowRight, RotateCcw, MessageSquare, Plus, CircleAlert } from "lucide-react"
+import { ArrowRight, RotateCcw, Plus, CircleAlert } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { useAlertDialog } from "@/hooks/use-confirm-dialog"
 import { SiteLoader } from "@/components/ui/site-loader"
-import { formatQuranRange, getActivePlanDayNumber, getPlanSessionContent, getPlanSupportSessionContent, resolvePlanTotalDays, resolvePlanTotalPages, SURAHS } from "@/lib/quran-data"
+import { formatQuranRange, getActivePlanDayNumber, getNextAyahReference, getPlanSessionContent, getPlanSupportSessionContent, resolvePlanTotalDays, resolvePlanTotalPages, SURAHS } from "@/lib/quran-data"
 import { type AttendanceStatus, isEvaluatedAttendance, isNonEvaluatedAttendance } from "@/lib/student-attendance"
 import { getHafizExtraLabel, getHafizExtraPoints, HAFIZ_EXTRA_PAGE_VALUES, normalizeHafizExtraPages, type HafizExtraPages } from "@/lib/hafiz-extra"
 
@@ -60,7 +59,6 @@ interface StudentAttendance {
 	evaluation?: EvaluationOption
 	readingDetails?: ReadingDetails
 	planReadingDetails?: ReadingDetails
-	notes?: string
 	hafizExtraPages?: HafizExtraPages | null
 	savedToday?: boolean
 }
@@ -167,7 +165,123 @@ const getPlanReadingDetails = (plan: StudentPlan | null, completedDays: number, 
 	}
 }
 
-const formatReadingDetails = (details?: EvaluationContent | null) => {
+const interactiveReadingUnderlineClassName = "underline decoration-[#3453a7]/45 decoration-[1.5px] underline-offset-2"
+const interactiveReadingButtonClassName = `rounded-sm bg-transparent p-0 font-inherit leading-inherit text-inherit ${interactiveReadingUnderlineClassName} transition-colors hover:text-[#28448e]`
+
+const getSurahByName = (name?: string | null) => SURAHS.find((surah) => surah.name === String(name || "").trim()) || null
+
+const compareAyahRefs = (leftSurahNumber: number, leftVerseNumber: number, rightSurahNumber: number, rightVerseNumber: number) => {
+	if (leftSurahNumber !== rightSurahNumber) {
+		return leftSurahNumber - rightSurahNumber
+	}
+
+	return leftVerseNumber - rightVerseNumber
+}
+
+const getPreviousAyahReference = (surahNumber: number, ayahNumber: number) => {
+	const surah = SURAHS.find((item) => item.number === surahNumber)
+	if (!surah) return null
+
+	if (ayahNumber > 1) {
+		return { surah: surahNumber, ayah: ayahNumber - 1 }
+	}
+
+	const previousSurah = SURAHS.find((item) => item.number === surahNumber - 1)
+	return previousSurah ? { surah: previousSurah.number, ayah: previousSurah.verseCount } : null
+}
+
+const getReadingTraversalRefs = (details: EvaluationContent | null | undefined) => {
+	const startSurah = getSurahByName(details?.fromSurah)
+	const endSurah = getSurahByName(details?.toSurah)
+	const startVerse = Number(details?.fromVerse)
+	const endVerse = Number(details?.toVerse)
+
+	if (!startSurah || !endSurah || !Number.isInteger(startVerse) || !Number.isInteger(endVerse)) {
+		return [] as Array<{ surahName: string; surahNumber: number; verseNumber: number }>
+	}
+
+	const direction = compareAyahRefs(startSurah.number, startVerse, endSurah.number, endVerse) <= 0 ? "asc" : "desc"
+	const refs: Array<{ surahName: string; surahNumber: number; verseNumber: number }> = []
+	let currentRef: { surah: number; ayah: number } | null = { surah: startSurah.number, ayah: startVerse }
+	let guard = 0
+
+	while (currentRef && guard < 7000) {
+		const currentSurah = SURAHS.find((surah) => surah.number === currentRef?.surah)
+		if (!currentSurah) break
+
+		refs.push({
+			surahName: currentSurah.name,
+			surahNumber: currentSurah.number,
+			verseNumber: currentRef.ayah,
+		})
+
+		if (currentRef.surah === endSurah.number && currentRef.ayah === endVerse) {
+			break
+		}
+
+		currentRef = direction === "asc"
+			? getNextAyahReference(currentRef.surah, currentRef.ayah)
+			: getPreviousAyahReference(currentRef.surah, currentRef.ayah)
+		guard += 1
+	}
+
+	return refs
+}
+
+const getReadingEndSurahOptions = (details: EvaluationContent | null | undefined) => {
+	const refs = getReadingTraversalRefs(details)
+	const seen = new Set<string>()
+	return refs
+		.filter((ref) => {
+			if (seen.has(ref.surahName)) return false
+			seen.add(ref.surahName)
+			return true
+		})
+		.map((ref) => ref.surahName)
+}
+
+const getReadingEndVerseOptions = (details: EvaluationContent | null | undefined, surahName?: string | null) => {
+	const targetSurahName = String(surahName || "").trim()
+	const refs = getReadingTraversalRefs(details).filter((ref) => ref.surahName === targetSurahName)
+	const seen = new Set<number>()
+	return refs
+		.filter((ref) => {
+			if (seen.has(ref.verseNumber)) return false
+			seen.add(ref.verseNumber)
+			return true
+		})
+		.map((ref) => String(ref.verseNumber))
+}
+
+const renderReadingDetails = (details: EvaluationContent | null | undefined, type: ContentfulEvaluationType, onEdit?: () => void) => {
+	if (details?.fromSurah && details?.fromVerse && details?.toSurah && details?.toVerse) {
+		const underlineEndSurah = type === "samaa" || type === "rabet"
+		const underlineEndVerse = type === "hafiz" || type === "samaa" || type === "rabet"
+		const renderInteractiveValue = (value: string, isInteractive: boolean) => {
+			if (!isInteractive || !onEdit) {
+				return <span className={isInteractive ? interactiveReadingUnderlineClassName : undefined}>{value}</span>
+			}
+
+			return (
+				<button type="button" onClick={onEdit} className={interactiveReadingButtonClassName}>
+					{value}
+				</button>
+			)
+		}
+
+		return (
+			<>
+				<span>{details.fromSurah}</span>
+				<span> </span>
+				<span>{details.fromVerse}</span>
+				<span> الى </span>
+				{renderInteractiveValue(details.toSurah, underlineEndSurah)}
+				<span> </span>
+				{renderInteractiveValue(details.toVerse, underlineEndVerse)}
+			</>
+		)
+	}
+
 	if (details?.text?.trim()) {
 		return details.text
 	}
@@ -274,7 +388,6 @@ const hasPendingLocalChanges = (students: StudentAttendance[]) =>
 			!student.savedToday &&
 			(
 				student.attendance !== null ||
-				!!student.notes ||
 				!!student.hafizExtraPages ||
 				!!student.evaluation?.hafiz ||
 				!!student.evaluation?.tikrar ||
@@ -298,11 +411,10 @@ export default function HalaqahManagement() {
 	const [isSaving, setIsSaving] = useState(false)
 	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle")
 	const [hasSavedToday, setHasSavedToday] = useState(false)
-	const [notesStudentId, setNotesStudentId] = useState<string | null>(null)
-	const [notesText, setNotesText] = useState("")
-	const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false)
         const [isCompDialogOpen, setIsCompDialogOpen] = useState(false)
 	const [isHafizExtraDialogOpen, setIsHafizExtraDialogOpen] = useState(false)
+	const [readingEditTarget, setReadingEditTarget] = useState<{ studentId: string; type: ContentfulEvaluationType } | null>(null)
+	const [readingEditDraft, setReadingEditDraft] = useState<{ toSurah: string; toVerse: string }>({ toSurah: "", toVerse: "" })
 	const [hafizExtraStudentId, setHafizExtraStudentId] = useState<string | null>(null)
 	const [draftHafizExtraPages, setDraftHafizExtraPages] = useState<HafizExtraPages | null>(null)
 	const [compStudentId, setCompStudentId] = useState<string | null>(null)
@@ -509,7 +621,6 @@ export default function HalaqahManagement() {
 						evaluation: hasUnsavedLocalChanges ? localStudent.evaluation || {} : {},
 						readingDetails: hasUnsavedLocalChanges ? localStudent.readingDetails || planReadingDetails : planReadingDetails,
 						planReadingDetails,
-						notes: hasUnsavedLocalChanges ? localStudent.notes : undefined,
 						hafizExtraPages: hasUnsavedLocalChanges ? (localStudent.hafizExtraPages || null) : null,
 						savedToday: false,
 					}
@@ -666,7 +777,7 @@ export default function HalaqahManagement() {
 						attendance: student.attendance,
 						evaluation: student.evaluation || {},
 						readingDetails: student.readingDetails || {},
-						notes: student.notes || null,
+						plannedReadingDetails: student.planReadingDetails || {},
 						hafizExtraPages: student.hafizExtraPages || null,
 					})),
 				}),
@@ -848,21 +959,6 @@ export default function HalaqahManagement() {
 		}
 	}
 
-		const openNotesDialog = (studentId: string) => {
-		const student = students.find((s) => s.id === studentId)
-			if (student?.savedToday) return
-		setNotesStudentId(studentId)
-		setNotesText(student?.notes || "")
-		setIsNotesDialogOpen(true)
-	}
-
-	const saveNotes = () => {
-		if (notesStudentId !== null) {
-			setStudents(students.map((s) => s.id === notesStudentId ? { ...s, notes: notesText } : s))
-		}
-		setIsNotesDialogOpen(false)
-	}
-
 	const openHafizExtraDialog = (studentId: string) => {
 		const student = students.find((item) => item.id === studentId)
 		if (!student || !canManageHafizExtra(student)) return
@@ -887,6 +983,54 @@ export default function HalaqahManagement() {
 		setDraftHafizExtraPages(null)
 	}
 
+	const closeReadingEditDialog = () => {
+		setReadingEditTarget(null)
+		setReadingEditDraft({ toSurah: "", toVerse: "" })
+	}
+
+	const openReadingEditDialog = (studentId: string, type: ContentfulEvaluationType) => {
+		const student = students.find((item) => item.id === studentId)
+		const details = student?.readingDetails?.[type]
+		if (student?.savedToday || !details?.fromSurah || !details?.fromVerse || !details?.toSurah || !details?.toVerse) {
+			return
+		}
+
+		setReadingEditTarget({ studentId, type })
+		setReadingEditDraft({
+			toSurah: details.toSurah,
+			toVerse: details.toVerse,
+		})
+	}
+
+	const saveReadingEdit = () => {
+		if (!readingEditTarget || !readingEditDraft.toSurah || !readingEditDraft.toVerse) return
+
+		setStudents((prev) => prev.map((student) => {
+			if (student.id !== readingEditTarget.studentId) {
+				return student
+			}
+
+			const currentDetails = student.readingDetails?.[readingEditTarget.type]
+			if (!currentDetails) {
+				return student
+			}
+
+			return {
+				...student,
+				readingDetails: {
+					...student.readingDetails,
+					[readingEditTarget.type]: {
+						...currentDetails,
+						toSurah: readingEditDraft.toSurah,
+						toVerse: readingEditDraft.toVerse,
+					},
+				},
+			}
+		}))
+
+		closeReadingEditDialog()
+	}
+
 	const halaqahName = teacherData?.halaqah || "الحلقة"
 
 	const EvaluationOption = ({
@@ -902,7 +1046,14 @@ export default function HalaqahManagement() {
 		const currentLevel = student?.evaluation?.[type] || null
 		const currentDetails = type === "hafiz" || type === "samaa" || type === "rabet" ? student?.readingDetails?.[type] : null
 		const showsReadingFields = type === "hafiz" || type === "samaa" || type === "rabet"
-		const readingSummary = formatReadingDetails(currentDetails)
+		const canEditReading = showsReadingFields && !student?.savedToday && !!currentDetails?.fromSurah && !!currentDetails?.fromVerse && !!currentDetails?.toSurah && !!currentDetails?.toVerse
+		const readingSummary = showsReadingFields
+			? renderReadingDetails(
+				currentDetails,
+				type as ContentfulEvaluationType,
+				canEditReading ? () => openReadingEditDialog(studentId, type as ContentfulEvaluationType) : undefined,
+			)
+			: null
 		const emptyReadingMessage =
 			type === "samaa"
 				? "لا يوجد لديه مراجعة لليوم"
@@ -958,6 +1109,12 @@ export default function HalaqahManagement() {
 	const savedStudentsCount = students.filter((student) => student.savedToday).length
 	const pendingStudentsCount = students.filter(isStudentReadyToSave).length
 	const hasPendingStudents = pendingStudentsCount > 0
+	const readingEditStudent = readingEditTarget ? students.find((student) => student.id === readingEditTarget.studentId) || null : null
+	const readingEditDetails = readingEditTarget ? readingEditStudent?.readingDetails?.[readingEditTarget.type] || null : null
+	const readingEditSurahOptions = getReadingEndSurahOptions(readingEditDetails)
+	const effectiveReadingEditSurah = readingEditDraft.toSurah || readingEditDetails?.toSurah || readingEditSurahOptions[0] || ""
+	const readingEditVerseOptions = getReadingEndVerseOptions(readingEditDetails, effectiveReadingEditSurah)
+	const effectiveReadingEditVerse = readingEditDraft.toVerse || readingEditVerseOptions[0] || ""
 	return (
 		<div className="min-h-screen flex flex-col bg-white">
 			<Header />
@@ -1054,16 +1211,12 @@ export default function HalaqahManagement() {
 																<p className="text-base font-bold text-[#1a2332]">{student.name}</p>
 																<Button
 																	variant="outline"
-																	onClick={() => openNotesDialog(student.id)}
-																	title="الملاحظات"
-																	disabled={student.savedToday}
-																	className={`h-5 w-5 rounded-md p-0 transition-all flex-shrink-0 ${
-																		student.notes
-																			? "bg-[#3453a7]/20 border-[#3453a7] text-neutral-800 hover:bg-[#3453a7]/25 hover:border-[#3453a7] focus-visible:bg-[#3453a7]/20 focus-visible:border-[#3453a7] focus-visible:text-neutral-800 focus-visible:ring-[#3453a7]/30"
-																			: "border-[#3453a7]/80 text-neutral-600 hover:bg-[#3453a7]/10 hover:border-[#3453a7] hover:text-neutral-800 focus-visible:bg-[#3453a7]/10 focus-visible:border-[#3453a7] focus-visible:text-neutral-800 focus-visible:ring-[#3453a7]/30"
-																	}`}
+																	onClick={() => openHafizExtraDialog(student.id)}
+																	title={student.hafizExtraPages ? `زيادة الحفظ: ${getHafizExtraLabel(student.hafizExtraPages)}` : "زيادة الحفظ"}
+																	disabled={!canManageHafizExtra(student)}
+																	className={`h-5 w-5 rounded-md p-0 transition-all flex-shrink-0 ${student.hafizExtraPages ? "bg-emerald-100 border-emerald-400 text-emerald-700 hover:bg-emerald-200 focus-visible:ring-emerald-300" : "border-[#3453a7]/80 text-neutral-600 hover:bg-[#3453a7]/10 hover:border-[#3453a7] hover:text-neutral-800 focus-visible:bg-[#3453a7]/10 focus-visible:border-[#3453a7] focus-visible:text-neutral-800 focus-visible:ring-[#3453a7]/30"}`}
 																>
-																	<MessageSquare className="w-3 h-3" />
+																	<Plus className="w-3 h-3" />
 																</Button>
 																<Button
 																	variant="outline"
@@ -1073,15 +1226,6 @@ export default function HalaqahManagement() {
 																	className="h-5 w-5 rounded-md p-0 transition-all flex-shrink-0 border-[#3453a7]/80 text-neutral-600 hover:bg-[#3453a7]/10 hover:border-[#3453a7] hover:text-neutral-800 focus-visible:bg-[#3453a7]/10 focus-visible:border-[#3453a7] focus-visible:text-neutral-800 focus-visible:ring-[#3453a7]/30"
 																>
 																	<RotateCcw className="w-3 h-3" />
-																</Button>
-																<Button
-																	variant="outline"
-																	onClick={() => openHafizExtraDialog(student.id)}
-																	title={student.hafizExtraPages ? `زيادة الحفظ: ${getHafizExtraLabel(student.hafizExtraPages)}` : "زيادة الحفظ"}
-																	disabled={!canManageHafizExtra(student)}
-																	className={`h-5 w-5 rounded-md p-0 transition-all flex-shrink-0 ${student.hafizExtraPages ? "bg-emerald-100 border-emerald-400 text-emerald-700 hover:bg-emerald-200 focus-visible:ring-emerald-300" : "border-[#3453a7]/80 text-neutral-600 hover:bg-[#3453a7]/10 hover:border-[#3453a7] hover:text-neutral-800 focus-visible:bg-[#3453a7]/10 focus-visible:border-[#3453a7] focus-visible:text-neutral-800 focus-visible:ring-[#3453a7]/30"}`}
-																>
-																	<Plus className="w-3 h-3" />
 																</Button>
 															</div>
 															{student.hafizExtraPages && (
@@ -1198,6 +1342,81 @@ export default function HalaqahManagement() {
 			<Footer />
 
 			{/* Notes Dialog */}
+			<Dialog open={!!readingEditTarget} onOpenChange={(open) => { if (!open) closeReadingEditDialog() }}>
+				<DialogContent className="max-w-md" dir="rtl">
+					<DialogTitle className="text-center text-xl font-bold text-[#1a2332]">النهاية الفعلية</DialogTitle>
+					<div className="space-y-4 pt-4">
+						<p className="rounded-xl border border-[#3453a7]/15 bg-[#f5f8ff] px-3 py-2 text-xs font-medium leading-6 text-[#3453a7]">
+							حدّد إلى أين وصل الطالب فعليًا ضمن المقطع المخطط لليوم.
+						</p>
+						{readingEditDetails?.fromSurah && readingEditDetails?.fromVerse && (
+							<div className="rounded-xl border border-[#3453a7]/10 bg-neutral-50 px-3 py-2 text-sm text-[#1a2332]">
+								البداية ثابتة: {readingEditDetails.fromSurah} {readingEditDetails.fromVerse}
+							</div>
+						)}
+						{readingEditSurahOptions.length > 1 && (
+							<div className="space-y-2">
+								<p className="text-sm font-semibold text-[#1a2332]">السورة النهائية</p>
+								<Select
+									value={effectiveReadingEditSurah}
+									onValueChange={(value) => {
+										const verseOptions = getReadingEndVerseOptions(readingEditDetails, value)
+										setReadingEditDraft({
+											toSurah: value,
+											toVerse: verseOptions[0] || "",
+										})
+									}}
+								>
+									<SelectTrigger className="h-10 w-full rounded-lg border-[#3453a7]/40 text-right text-sm" dir="rtl">
+										<SelectValue placeholder="اختر السورة" />
+									</SelectTrigger>
+									<SelectContent dir="rtl">
+										{readingEditSurahOptions.map((surahName) => (
+											<SelectItem key={surahName} value={surahName}>
+												{surahName}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+						)}
+						<div className="space-y-2">
+							<p className="text-sm font-semibold text-[#1a2332]">الآية النهائية</p>
+							<Select
+								value={effectiveReadingEditVerse}
+								onValueChange={(value) => setReadingEditDraft({ toSurah: effectiveReadingEditSurah, toVerse: value })}
+							>
+								<SelectTrigger className="h-10 w-full rounded-lg border-[#3453a7]/40 text-right text-sm" dir="rtl">
+									<SelectValue placeholder="اختر الآية" />
+								</SelectTrigger>
+								<SelectContent dir="rtl">
+									{readingEditVerseOptions.map((verse) => (
+										<SelectItem key={verse} value={verse}>
+											{verse}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="flex gap-2 justify-end">
+							<Button
+								variant="outline"
+								onClick={closeReadingEditDialog}
+								className="text-sm h-9 rounded-lg border-[#3453a7]/80 text-neutral-600"
+							>
+								إلغاء
+							</Button>
+							<Button
+								onClick={saveReadingEdit}
+								disabled={!effectiveReadingEditSurah || !effectiveReadingEditVerse}
+								className="text-sm h-9 rounded-lg bg-[#3453a7] text-white hover:bg-[#28448e]"
+							>
+								حفظ النهاية
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 			
                         <Dialog open={isCompDialogOpen} onOpenChange={setIsCompDialogOpen}>
                                 <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto" dir="rtl">
@@ -1235,36 +1454,6 @@ export default function HalaqahManagement() {
                                         </div>
                                 </DialogContent>
                         </Dialog>
-
-                        <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
-				<DialogContent className="max-w-md" dir="rtl">
-					<DialogTitle className="sr-only">الملاحظات</DialogTitle>
-					<div className="space-y-4 pt-4">
-						<Textarea
-							value={notesText}
-							onChange={(e) => setNotesText(e.target.value)}
-							placeholder="اكتب ملاحظاتك هنا..."
-							className="min-h-[120px] text-right border-[#3453a7]/50 focus-visible:ring-[#3453a7]/50"
-						/>
-						<div className="flex gap-2 justify-end">
-							<Button
-								variant="outline"
-								onClick={() => setIsNotesDialogOpen(false)}
-								className="text-sm h-9 rounded-lg border-[#3453a7]/80 text-neutral-600"
-							>
-								إلغاء
-							</Button>
-							<Button
-								variant="outline"
-								onClick={saveNotes}
-								className="text-sm h-9 rounded-lg border-[#3453a7]/80 text-neutral-600 hover:bg-[#3453a7]/20 hover:border-[#3453a7] hover:text-neutral-800"
-							>
-								حفظ الملاحظة
-							</Button>
-						</div>
-					</div>
-				</DialogContent>
-			</Dialog>
 
 			<Dialog open={isHafizExtraDialogOpen} onOpenChange={setIsHafizExtraDialogOpen}>
 				<DialogContent className="max-w-md" dir="rtl">

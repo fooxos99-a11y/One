@@ -49,6 +49,7 @@ import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { hasPermissionAccess } from "@/lib/admin-permissions"
 import { GlobalAddStudentDialog } from "@/components/global-add-student-dialog"
 import { GlobalEditStudentDialog } from "@/components/admin-modals/global-edit-student-dialog"
+import { GlobalStudentExamsDialog } from "@/components/admin-modals/global-student-exams-dialog"
 
 const inlineContentLoader = () => (
   <div className="flex min-h-[320px] items-center justify-center">
@@ -292,7 +293,7 @@ const adminSections: DashboardSection[] = [
         description: "الانتقال السريع إلى واجهة اختبار الطلاب الإدارية.",
         icon: ClipboardCheck,
         permissionKey: "اختبار الطلاب",
-        getPath: () => "/admin/student-exams",
+        getPath: () => "/admin/dashboard?action=student-exams",
       },
       {
         key: "general-pathways",
@@ -733,6 +734,10 @@ export default function AdminDashboardPage() {
 
     if (activeAction.resolvedPath.includes("action=edit-student") || activeAction.resolvedPath.includes("action=edit-points")) {
       return "edit-student" as const
+    }
+
+    if (activeAction.resolvedPath.includes("action=student-exams")) {
+      return "student-exams" as const
     }
 
     return null
@@ -1551,6 +1556,14 @@ export default function AdminDashboardPage() {
                         <GlobalEditStudentDialog
                           displayMode="inline"
                           onInlineActionsChange={setEditStudentInlineActions}
+                          onCloseComplete={() => {
+                            setInlineDialogAction(null)
+                            setActiveActionKey("")
+                          }}
+                        />
+                      ) : activeDialogAction === "student-exams" ? (
+                        <GlobalStudentExamsDialog
+                          forcedOpen
                           onCloseComplete={() => {
                             setInlineDialogAction(null)
                             setActiveActionKey("")

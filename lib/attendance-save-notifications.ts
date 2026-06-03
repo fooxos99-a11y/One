@@ -50,6 +50,54 @@ function translateEvaluationLevel(level: EvaluationLevelValue) {
   return EVALUATION_LEVEL_LABELS[level] || String(level)
 }
 
+type WeeklyAttendanceEntry = {
+  date: string
+  status: string
+  hafiz?: EvaluationLevelValue
+  tikrar?: EvaluationLevelValue
+  samaa?: EvaluationLevelValue
+  rabet?: EvaluationLevelValue
+  hafizAmount?: string | null
+}
+
+const ARABIC_WEEKDAY_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"] as const
+
+function getArabicWeekdayLabel(date: string) {
+  const parsedDate = new Date(`${date}T00:00:00+03:00`)
+  return ARABIC_WEEKDAY_NAMES[parsedDate.getUTCDay()] || date
+}
+
+function buildWeeklyAttendanceDaysSummary(entries: WeeklyAttendanceEntry[]) {
+  return entries
+    .map((entry) => {
+      const statusLabel = translateAttendanceStatus(entry.status) || entry.status || "غير محدد"
+      const lineParts = [`${getArabicWeekdayLabel(entry.date)} ${entry.date}: ${statusLabel}`]
+
+      if (entry.hafiz || entry.hafizAmount) {
+        lineParts.push(`الحفظ ${translateEvaluationLevel(entry.hafiz)}`)
+      }
+
+      if (entry.hafizAmount) {
+        lineParts.push(`المقدار ${entry.hafizAmount}`)
+      }
+
+      if (entry.tikrar) {
+        lineParts.push(`التكرار ${translateEvaluationLevel(entry.tikrar)}`)
+      }
+
+      if (entry.samaa) {
+        lineParts.push(`المراجعة ${translateEvaluationLevel(entry.samaa)}`)
+      }
+
+      if (entry.rabet) {
+        lineParts.push(`الربط ${translateEvaluationLevel(entry.rabet)}`)
+      }
+
+      return `- ${lineParts.join(" | ")}`
+    })
+    .join("\n")
+}
+
 async function buildAttendanceGuardianMessage(params: {
   studentName: string
   halaqah?: string | null
@@ -85,6 +133,27 @@ export async function loadAttendanceSaveGuardianTemplates() {
       DEFAULT_ATTENDANCE_SAVE_NOTIFICATION_TEMPLATES,
     ),
   )
+}
+
+export async function buildAttendanceWeeklyGuardianMessage(params: {
+  studentName: string
+  halaqah?: string | null
+  weekStart: string
+  weekEnd: string
+  entries: WeeklyAttendanceEntry[]
+  templates?: AttendanceSaveNotificationTemplates
+}) {
+  const templates = params.templates || await loadAttendanceSaveGuardianTemplates()
+
+  return fillAttendanceSaveNotificationTemplate(templates.weekly, {
+    studentName: params.studentName,
+    halaqah: params.halaqah,
+    date: params.weekEnd,
+    status: "",
+    weekStart: params.weekStart,
+    weekEnd: params.weekEnd,
+    weekDays: buildWeeklyAttendanceDaysSummary(params.entries),
+  })
 }
 
 export async function sendAttendanceSaveGuardianNotification(params: AttendanceNotificationParams) {

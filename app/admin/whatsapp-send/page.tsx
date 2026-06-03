@@ -1177,7 +1177,7 @@ export function WhatsAppSendContent({
                     <Button
                       onClick={handleSendMessages}
                       disabled={isSending || isWhatsAppStatusLoading || selectedRecipients.length === 0 || (!message.trim() && !imagePayload)}
-                      className="theme-pill-solid h-9 w-full rounded-lg text-sm !text-white hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60"
+                      className="h-9 w-full rounded-lg border-none bg-[#3453a7] text-sm font-bold text-white shadow-[0_10px_24px_rgba(52,83,167,0.18)] hover:bg-[#24428f] hover:text-white focus-visible:bg-[#24428f] focus-visible:text-white active:bg-[#203a7c] active:text-white disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100"
                     >
                       {isSending ? "جاري الإرسال" : <><Send className="w-4 h-4 ml-2" />إرسال</>}
                     </Button>

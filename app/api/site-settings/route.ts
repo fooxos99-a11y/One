@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdminPermissionsForSession, requireRoles } from "@/lib/auth/guards"
 import { getSiteSetting, upsertSiteSetting } from "@/lib/site-settings"
 import {
+	ATTENDANCE_AUTO_SEND_SETTINGS_ID,
 	EXAM_PORTION_SETTINGS_ID,
 	EXAM_SETTINGS_ID,
 	RECITATION_DAY_GRADING_SETTINGS_ID,
 	SITE_DESIGN_SETTINGS_ID,
+	ATTENDANCE_WEEKLY_REPORT_LOG_SETTING_ID,
 	TEACHER_ATTENDANCE_DELAY_SETTING_ID,
 } from "@/lib/site-settings-constants"
 import { EXAM_WHATSAPP_SETTINGS_ID } from "@/lib/whatsapp-notification-templates"
@@ -21,6 +23,8 @@ const SITE_SETTING_PERMISSIONS: Record<string, string | string[]> = {
 	[PATHWAY_LEVEL_NOTIFICATION_SETTINGS_ID]: "إدارة المسار",
 	[TEACHER_ATTENDANCE_DELAY_SETTING_ID]: "تقارير المعلمين",
 	[ATTENDANCE_SAVE_NOTIFICATION_SETTINGS_ID]: "السجل اليومي للطلاب",
+	[ATTENDANCE_AUTO_SEND_SETTINGS_ID]: "السجل اليومي للطلاب",
+	[ATTENDANCE_WEEKLY_REPORT_LOG_SETTING_ID]: "السجل اليومي للطلاب",
 	[RECITATION_DAY_NOTIFICATION_SETTINGS_ID]: "يوم السرد",
 	[RECITATION_DAY_LIFECYCLE_NOTIFICATION_SETTINGS_ID]: "يوم السرد",
 	[RECITATION_DAY_GRADING_SETTINGS_ID]: "يوم السرد",

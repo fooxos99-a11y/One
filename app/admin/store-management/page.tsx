@@ -9,7 +9,7 @@ import { Footer } from "@/components/footer";
 import { SiteLoader } from "@/components/ui/site-loader"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ShoppingBag, Tag, Package, Plus, Trash2, Image as ImageIcon, X } from "lucide-react";
+import { ShoppingBag, Tag, Package, Plus, Trash2, Image as ImageIcon, X, Lock, Unlock } from "lucide-react";
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 
 type StoreAddDialogView = "product" | "category" | null
@@ -32,6 +32,9 @@ export function StoreManagementContent({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
+  const [isStoreOpen, setIsStoreOpen] = useState(true)
+  const [isStoreStatusLoading, setIsStoreStatusLoading] = useState(true)
+  const [isSavingStoreStatus, setIsSavingStoreStatus] = useState(false)
 
   function showConfirm(msg: string, cb: () => void) {
     setConfirmMessage(msg);
@@ -67,7 +70,7 @@ export function StoreManagementContent({
   }, [onInlineActionsChange, router])
 
   useEffect(() => {
-    fetchData();
+    void Promise.all([fetchData(), fetchStoreStatus()]);
   }, []);
 
   async function fetchData() {
@@ -78,6 +81,42 @@ export function StoreManagementContent({
     setProducts(productsData || []);
     setCategories(categoriesData || []);
     setLoading(false);
+  }
+
+  async function fetchStoreStatus() {
+    setIsStoreStatusLoading(true)
+    try {
+      const response = await fetch("/api/store/status", { cache: "no-store" })
+      const data = response.ok ? await response.json().catch(() => null) : null
+      setIsStoreOpen(data?.isOpen !== false)
+    } catch {
+      setIsStoreOpen(true)
+    } finally {
+      setIsStoreStatusLoading(false)
+    }
+  }
+
+  async function handleToggleStoreStatus() {
+    setIsSavingStoreStatus(true)
+    try {
+      const response = await fetch("/api/store/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOpen: !isStoreOpen }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        alert(data?.error || "تعذر تحديث حالة المتجر")
+        return
+      }
+
+      setIsStoreOpen(data?.value?.isOpen !== false)
+    } catch {
+      alert("حدث خطأ أثناء تحديث حالة المتجر")
+    } finally {
+      setIsSavingStoreStatus(false)
+    }
   }
 
   async function handleAddProduct(e: any) {
@@ -167,6 +206,32 @@ export function StoreManagementContent({
 
   const content = (
     <div className="container mx-auto max-w-5xl space-y-8">
+      <div className="overflow-hidden rounded-[2rem] border border-[#e5edf8] bg-white shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-bold ${isStoreOpen ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "border border-red-200 bg-red-50 text-red-600"}`}>
+                {isStoreStatusLoading ? "جاري التحقق..." : isStoreOpen ? "المتجر مفتوح" : "المتجر مغلق"}
+              </span>
+              <h2 className="text-lg font-black text-[#1a2332]">حالة المتجر</h2>
+            </div>
+            <p className="mt-2 text-sm text-[#6c7d95]">عند إغلاق المتجر يختفي زر المتجر من الطلاب وتُمنع صفحة المتجر وطلبات الشراء.</p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleToggleStoreStatus}
+            disabled={isStoreStatusLoading || isSavingStoreStatus}
+            className={`h-11 rounded-2xl px-6 text-sm font-black text-white ${isStoreOpen ? "bg-red-500 hover:bg-red-600" : "bg-[#3453a7] hover:bg-[#24428f]"}`}
+          >
+            {isSavingStoreStatus ? "جاري الحفظ..." : isStoreOpen ? (
+              <span className="inline-flex items-center gap-2"><Lock className="h-4 w-4" />إغلاق المتجر</span>
+            ) : (
+              <span className="inline-flex items-center gap-2"><Unlock className="h-4 w-4" />فتح المتجر</span>
+            )}
+          </Button>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-[2rem] border border-[#e5edf8] bg-white shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
         <div className="flex items-center justify-between border-b border-[#e7eef8] px-6 py-5">
           <div className="flex items-center gap-3">
