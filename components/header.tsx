@@ -1527,6 +1527,7 @@ export function Header() {
       )}
 
       <header
+        dir="rtl"
         data-scrolled={isHeaderSolid ? "true" : "false"}
         className={isLandingPage ? "site-header fixed inset-x-0 top-0 z-50" : "site-header sticky top-0 z-50"}
       >

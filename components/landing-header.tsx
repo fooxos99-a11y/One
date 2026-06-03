@@ -1,14 +1,16 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Menu, User } from "lucide-react"
-import { LoginForm } from "@/components/login-form"
+import { Menu, Minus, Plus, User } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { performClientLogout } from "@/lib/auth/logout-client"
+
+const LoginForm = dynamic(() => import("@/components/login-form").then((module) => module.LoginForm))
 
 const ADMIN_LIKE_ROLES = new Set([
   "admin",
@@ -23,9 +25,13 @@ const ADMIN_LIKE_ROLES = new Set([
 const LANDING_LINKS = [
   { label: "الرئيسية", href: "#home" },
   { label: "الإنجازات", href: "#achievements" },
-  { label: "من نحن", href: "#about" },
   { label: "تواصل معنا", href: "#contact" },
 ] as const
+
+type CircleOption = {
+  id?: string
+  name?: string | null
+}
 
 function getLandingRoleLabel(role: string) {
   if (ADMIN_LIKE_ROLES.has(role)) return role === "admin" || role === "supervisor" ? "الإدارة" : role
@@ -46,6 +52,9 @@ export function LandingHeader() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState("")
   const [userName, setUserName] = useState("")
+  const [circles, setCircles] = useState<CircleOption[]>([])
+  const [isCirclesLoading, setIsCirclesLoading] = useState(false)
+  const [mobileExpandedGroup, setMobileExpandedGroup] = useState<"students" | "circles" | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -141,6 +150,39 @@ export function LandingHeader() {
     return () => mediaQuery.removeListener(syncPortraitMobileState)
   }, [])
 
+  useEffect(() => {
+    if (!isPortraitMobile || !isMobileHeaderLinksOpen || circles.length > 0 || isCirclesLoading) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadCircles = async () => {
+      try {
+        setIsCirclesLoading(true)
+        const response = await fetch("/api/circles", { cache: "no-store" })
+        const data = await response.json()
+        if (!cancelled) {
+          setCircles(Array.isArray(data?.circles) ? data.circles : [])
+        }
+      } catch {
+        if (!cancelled) {
+          setCircles([])
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCirclesLoading(false)
+        }
+      }
+    }
+
+    void loadCircles()
+
+    return () => {
+      cancelled = true
+    }
+  }, [circles.length, isCirclesLoading, isMobileHeaderLinksOpen, isPortraitMobile])
+
   const handleLoginDialogChange = (open: boolean) => {
     setIsLoginDialogOpen(open)
 
@@ -151,11 +193,13 @@ export function LandingHeader() {
 
   const handleNav = (href: string) => {
     setIsMobileHeaderLinksOpen(false)
+    setMobileExpandedGroup(null)
     router.push(href)
   }
 
   const handleLandingAnchorClick = (href: string) => {
     setIsMobileHeaderLinksOpen(false)
+    setMobileExpandedGroup(null)
     if (pathname && pathname !== "/") {
       router.push(`/${href}`)
       return
@@ -173,6 +217,10 @@ export function LandingHeader() {
 
   const handleLogout = () => {
     void performClientLogout(pathname || "/")
+  }
+
+  const toggleMobileGroup = (group: "students" | "circles") => {
+    setMobileExpandedGroup((current) => (current === group ? null : group))
   }
 
   const isStudentAccount = userRole === "student"
@@ -215,6 +263,14 @@ export function LandingHeader() {
               <Link href="/halaqat/all" className="site-header-nav-button">
                 أفضل الحلقات
               </Link>
+              <Link href="/students/all" className="site-header-nav-button">
+                أفضل الطلاب
+              </Link>
+              {(isTeacherAccount || isAdminAccount) ? (
+                <Link href="/competitions" className="site-header-nav-button">
+                  المسابقات
+                </Link>
+              ) : null}
             </div>
           </nav>
 
@@ -327,37 +383,88 @@ export function LandingHeader() {
         <>
           <div
             className={`fixed inset-0 z-[55] bg-black/25 transition-opacity duration-200 md:hidden ${isMobileHeaderLinksOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-            onClick={() => setIsMobileHeaderLinksOpen(false)}
+            onClick={() => {
+              setIsMobileHeaderLinksOpen(false)
+              setMobileExpandedGroup(null)
+            }}
           />
           <div
             dir="rtl"
             className={`fixed left-4 right-4 top-[5.5rem] z-[60] rounded-[28px] border border-[#d9e4fb] bg-white/95 p-3 shadow-[0_24px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl transition-all duration-200 md:hidden ${isMobileHeaderLinksOpen ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"}`}
           >
             <div className="grid gap-2">
-              {LANDING_LINKS.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => handleLandingAnchorClick(item.href)}
-                  className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
-                >
-                  <span>{item.label}</span>
-                </button>
-              ))}
               <button
                 type="button"
-                onClick={() => handleNav("/halaqat/all")}
-                className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
-              >
-                <span>أفضل الحلقات</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleNav("/students/all")}
+                onClick={() => toggleMobileGroup("students")}
                 className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
               >
                 <span>أفضل الطلاب</span>
+                {mobileExpandedGroup === "students" ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               </button>
+              {mobileExpandedGroup === "students" ? (
+                <div className="space-y-2 rounded-2xl border border-[#e8eef8] bg-[#f8fbff] p-2">
+                  <button
+                    type="button"
+                    onClick={() => handleNav("/students/all")}
+                    className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-2.5 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#eef4ff]"
+                  >
+                    <span>جميع الطلاب</span>
+                  </button>
+                  {isCirclesLoading ? (
+                    <div className="px-4 py-2 text-sm font-medium text-[#6b778c]">جاري التحميل...</div>
+                  ) : (
+                    circles
+                      .map((circle) => (circle.name || "").trim())
+                      .filter((circleName) => circleName.length > 0)
+                      .map((circleName) => (
+                        <button
+                          key={`students-${circleName}`}
+                          type="button"
+                          onClick={() => handleNav(`/halaqat/${encodeURIComponent(circleName)}`)}
+                          className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-2.5 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#eef4ff]"
+                        >
+                          <span>{circleName}</span>
+                        </button>
+                      ))
+                  )}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => toggleMobileGroup("circles")}
+                className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
+              >
+                <span>أفضل الحلقات</span>
+                {mobileExpandedGroup === "circles" ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              </button>
+              {mobileExpandedGroup === "circles" ? (
+                <div className="space-y-2 rounded-2xl border border-[#e8eef8] bg-[#f8fbff] p-2">
+                  <button
+                    type="button"
+                    onClick={() => handleNav("/halaqat/all")}
+                    className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-2.5 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#eef4ff]"
+                  >
+                    <span>جميع الحلقات</span>
+                  </button>
+                  {isCirclesLoading ? (
+                    <div className="px-4 py-2 text-sm font-medium text-[#6b778c]">جاري التحميل...</div>
+                  ) : (
+                    circles
+                      .map((circle) => (circle.name || "").trim())
+                      .filter((circleName) => circleName.length > 0)
+                      .map((circleName) => (
+                        <button
+                          key={`circles-${circleName}`}
+                          type="button"
+                          onClick={() => handleNav(`/halaqat/${encodeURIComponent(circleName)}`)}
+                          className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-2.5 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#eef4ff]"
+                        >
+                          <span>{circleName}</span>
+                        </button>
+                      ))
+                  )}
+                </div>
+              ) : null}
               {(isTeacherAccount || isAdminAccount) ? (
                 <button
                   type="button"
@@ -377,9 +484,11 @@ export function LandingHeader() {
           <DialogHeader className="mb-2 text-right">
             <DialogTitle className="text-2xl font-black text-[#1a2332]">تسجيل الدخول</DialogTitle>
           </DialogHeader>
-          <div>
-            <LoginForm onSuccess={() => setIsLoginDialogOpen(false)} />
-          </div>
+          {isLoginDialogOpen ? (
+            <div>
+              <LoginForm onSuccess={() => setIsLoginDialogOpen(false)} />
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

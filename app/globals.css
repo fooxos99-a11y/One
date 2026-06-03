@@ -59,11 +59,8 @@
   --challenge-secondary: #3453a7;
   --challenge-accent: #ffffff;
   --challenge-success: #20335f;
-  --landing-hero:
-    radial-gradient(circle at 50% 28%, rgba(183, 205, 255, 0.34) 0%, rgba(183, 205, 255, 0.18) 18%, transparent 38%),
-    radial-gradient(circle at 50% 42%, rgba(113, 149, 236, 0.34) 0%, rgba(79, 115, 209, 0.22) 28%, transparent 56%),
-    linear-gradient(180deg, #3553a8 0%, #2f4c9d 34%, #28458f 68%, #203772 100%);
-  --landing-page: radial-gradient(circle at 50% 0%, rgba(143, 176, 255, 0.13) 0%, rgba(143, 176, 255, 0.05) 24%, transparent 52%), linear-gradient(180deg, #eef3fb 0%, #e8eef8 28%, #f6f8fc 68%, #ffffff 100%);
+  --landing-hero: linear-gradient(180deg, #3553a8 0%, #2f4c9d 38%, #28458f 70%, #203772 100%);
+  --landing-page: linear-gradient(180deg, #eef3fb 0%, #e8eef8 34%, #f6f8fc 72%, #ffffff 100%);
 }
 
 .dark {
@@ -253,9 +250,7 @@
     color: var(--site-header-scrolled-accent);
     border-bottom-color: var(--header-scrolled-border);
     background: var(--header-scrolled-background);
-    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   }
 
   .site-header-mobile-button,
@@ -494,7 +489,7 @@
   }
 
   .landing-logo-top {
-    filter: brightness(0) invert(1) drop-shadow(0 8px 18px rgba(0, 0, 0, 0.22));
+    filter: brightness(0) invert(1);
   }
 
   .plan-history-checkbox {
@@ -608,16 +603,10 @@
   }
 }
 
-.landing-animate-float {
-  animation: landing-float 6s ease-in-out infinite;
-}
-
-.landing-animate-spin {
-  animation: landing-spin 28s linear infinite;
-}
-
+.landing-animate-float,
+.landing-animate-spin,
 .landing-animate-pulse {
-  animation: landing-pulse 5s ease-in-out infinite;
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

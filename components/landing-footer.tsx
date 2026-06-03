@@ -4,8 +4,6 @@ import { Mail, MapPin, Phone } from "lucide-react"
 export function LandingFooter() {
   return (
     <footer className="relative overflow-hidden border-t border-white/10 bg-[linear-gradient(135deg,#20335f_0%,#2b4691_54%,#3453a7_100%)] pt-16 pb-8 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_36%)]" aria-hidden />
-      <div className="absolute -left-16 bottom-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" aria-hidden />
       <div className="container relative mx-auto px-4">
         <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-12">
           <div className="col-span-2 md:col-span-1">

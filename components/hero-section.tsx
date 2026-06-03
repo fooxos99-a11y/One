@@ -4,26 +4,10 @@ export function HeroSection() {
   return (
     <section id="home" className="landing-hero-surface relative flex min-h-[100svh] items-center overflow-hidden px-4 sm:px-6">
       <div
-        className="landing-animate-spin absolute left-1/2 top-1/2 h-[34rem] w-[34rem] rounded-full border border-white/10"
-        aria-hidden
-      />
-      <div
-        className="landing-animate-float absolute left-1/2 top-1/2 h-[22rem] w-[22rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/8"
-        aria-hidden
-      />
-      <div
         className="absolute inset-0"
         style={{
           background:
             "linear-gradient(180deg, rgba(10,26,66,0.02) 0%, rgba(10,26,66,0.12) 100%)",
-        }}
-        aria-hidden
-      />
-      <div
-        className="absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.75) 1px, transparent 0)",
-          backgroundSize: "28px 28px",
         }}
         aria-hidden
       />
@@ -42,9 +26,9 @@ export function HeroSection() {
             />
           </div>
 
-          <div className="mx-auto mb-8 h-1 w-24 rounded-full bg-white/70" />
+          <div className="mx-auto mb-8 h-1 w-24 rounded-full bg-white/60" />
 
-          <h1 className="mb-6 text-4xl font-extrabold leading-[1.15] drop-shadow-sm sm:text-5xl md:text-6xl lg:text-7xl">
+          <h1 className="mb-6 text-4xl font-extrabold leading-[1.15] sm:text-5xl md:text-6xl lg:text-7xl">
             مجمع الملك خالد
           </h1>
 
