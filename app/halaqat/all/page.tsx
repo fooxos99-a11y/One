@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Header } from "@/components/header"
+import { LandingHeader } from "@/components/landing-header"
 import { Footer } from "@/components/footer"
 import { getDefaultLeaderboardTheme, getLeaderboardCrownTheme, isLockedLeaderboardRank } from "@/lib/leaderboard-rank-theme"
 import { Crown, MonitorPlay, X } from "lucide-react"
@@ -175,8 +175,8 @@ export default function AllCirclesPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col bg-white" dir="rtl">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
+        <LandingHeader />
+        <main className="flex-1 flex items-center justify-center pt-24">
           <div className="text-2xl text-[#20335f]">جاري التحميل...</div>
         </main>
         <Footer />
@@ -187,8 +187,8 @@ export default function AllCirclesPage() {
   if (circles.length === 0) {
     return (
       <div className="min-h-screen flex flex-col bg-white" dir="rtl">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
+        <LandingHeader />
+        <main className="flex-1 flex items-center justify-center pt-24">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold text-[#1a2332] mb-4">أفضل الحلقات</h1>
             <p className="text-xl text-gray-600">لا توجد حلقات تحتوي على نقاط حالياً</p>
@@ -201,9 +201,9 @@ export default function AllCirclesPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white" dir="rtl">
-      {!isAutoScrolling && <Header />}
+      {!isAutoScrolling && <LandingHeader />}
 
-      <main className="flex-1 py-8 md:py-16">
+      <main className="flex-1 pt-24 py-8 md:pt-28 md:py-16">
         <div className="container mx-auto px-3 md:px-4">
           <div className="text-center mb-8 md:mb-16">
             <div className="flex items-center justify-center gap-2 md:gap-4 mb-4 md:mb-6">

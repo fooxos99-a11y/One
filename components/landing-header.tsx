@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Menu, Minus, Plus, User } from "lucide-react"
+import { ChevronDown, Menu, User } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { performClientLogout } from "@/lib/auth/logout-client"
@@ -54,7 +54,7 @@ export function LandingHeader() {
   const [userName, setUserName] = useState("")
   const [circles, setCircles] = useState<CircleOption[]>([])
   const [isCirclesLoading, setIsCirclesLoading] = useState(false)
-  const [mobileExpandedGroup, setMobileExpandedGroup] = useState<"students" | "circles" | null>(null)
+  const [mobileExpandedGroup, setMobileExpandedGroup] = useState<"students" | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -150,36 +150,40 @@ export function LandingHeader() {
     return () => mediaQuery.removeListener(syncPortraitMobileState)
   }, [])
 
+  const loadCircles = async () => {
+    let cancelled = false
+
+    try {
+      setIsCirclesLoading(true)
+      const response = await fetch("/api/circles", { cache: "no-store" })
+      const data = await response.json()
+      if (!cancelled) {
+        setCircles(Array.isArray(data?.circles) ? data.circles : [])
+      }
+    } catch {
+      if (!cancelled) {
+        setCircles([])
+      }
+    } finally {
+      if (!cancelled) {
+        setIsCirclesLoading(false)
+      }
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }
+
   useEffect(() => {
     if (!isPortraitMobile || !isMobileHeaderLinksOpen || circles.length > 0 || isCirclesLoading) {
       return
     }
 
-    let cancelled = false
-
-    const loadCircles = async () => {
-      try {
-        setIsCirclesLoading(true)
-        const response = await fetch("/api/circles", { cache: "no-store" })
-        const data = await response.json()
-        if (!cancelled) {
-          setCircles(Array.isArray(data?.circles) ? data.circles : [])
-        }
-      } catch {
-        if (!cancelled) {
-          setCircles([])
-        }
-      } finally {
-        if (!cancelled) {
-          setIsCirclesLoading(false)
-        }
-      }
-    }
-
-    void loadCircles()
+    const cleanup = loadCircles()
 
     return () => {
-      cancelled = true
+      void cleanup.then((dispose) => dispose())
     }
   }, [circles.length, isCirclesLoading, isMobileHeaderLinksOpen, isPortraitMobile])
 
@@ -219,7 +223,15 @@ export function LandingHeader() {
     void performClientLogout(pathname || "/")
   }
 
-  const toggleMobileGroup = (group: "students" | "circles") => {
+  const handleBestStudentsMenuChange = (open: boolean) => {
+    if (!open || circles.length > 0 || isCirclesLoading) {
+      return
+    }
+
+    void loadCircles()
+  }
+
+  const toggleMobileGroup = (group: "students") => {
     setMobileExpandedGroup((current) => (current === group ? null : group))
   }
 
@@ -256,16 +268,45 @@ export function LandingHeader() {
           <nav className="hidden flex-1 items-center justify-center md:flex">
             <div className="flex items-center gap-7 lg:gap-10">
               {LANDING_LINKS.map((item) => (
-                <a key={item.label} href={item.href} className="site-header-nav-button">
+                <button key={item.label} type="button" onClick={() => handleLandingAnchorClick(item.href)} className="site-header-nav-button">
                   {item.label}
-                </a>
+                </button>
               ))}
               <Link href="/halaqat/all" className="site-header-nav-button">
                 أفضل الحلقات
               </Link>
-              <Link href="/students/all" className="site-header-nav-button">
-                أفضل الطلاب
-              </Link>
+              <DropdownMenu onOpenChange={handleBestStudentsMenuChange}>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="site-header-nav-button inline-flex items-center gap-1.5" aria-label="أفضل الطلاب">
+                    <span>أفضل الطلاب</span>
+                    <ChevronDown size={16} strokeWidth={2.4} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" sideOffset={12} className="w-56 rounded-2xl border border-[#d9e4fb] bg-white p-2 shadow-[0_20px_50px_rgba(19,39,89,0.14)]">
+                  <div dir="rtl">
+                    <DropdownMenuItem onClick={() => handleNav("/students/all")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]">
+                      <span className="w-full text-right">جميع الطلاب</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {isCirclesLoading ? (
+                      <div className="px-4 py-3 text-center text-sm font-medium text-[#6b778c]">جاري التحميل...</div>
+                    ) : (
+                      circles
+                        .map((circle) => ({ id: circle.id, name: (circle.name || "").trim() }))
+                        .filter((circle) => circle.name.length > 0)
+                        .map((circle) => (
+                          <DropdownMenuItem
+                            key={circle.id || circle.name}
+                            onClick={() => handleNav(`/halaqat/${encodeURIComponent(circle.name)}`)}
+                            className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]"
+                          >
+                            <span className="w-full text-right">{circle.name}</span>
+                          </DropdownMenuItem>
+                        ))
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {(isTeacherAccount || isAdminAccount) ? (
                 <Link href="/competitions" className="site-header-nav-button">
                   المسابقات
@@ -399,7 +440,7 @@ export function LandingHeader() {
                 className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
               >
                 <span>أفضل الطلاب</span>
-                {mobileExpandedGroup === "students" ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                <ChevronDown className={`h-4 w-4 transition-transform ${mobileExpandedGroup === "students" ? "rotate-180" : "rotate-0"}`} />
               </button>
               {mobileExpandedGroup === "students" ? (
                 <div className="space-y-2 rounded-2xl border border-[#e8eef8] bg-[#f8fbff] p-2">
@@ -431,40 +472,11 @@ export function LandingHeader() {
               ) : null}
               <button
                 type="button"
-                onClick={() => toggleMobileGroup("circles")}
+                onClick={() => handleNav("/halaqat/all")}
                 className="flex items-center justify-between rounded-2xl border border-[#e3ebfb] bg-white px-4 py-3 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#f8fbff]"
               >
                 <span>أفضل الحلقات</span>
-                {mobileExpandedGroup === "circles" ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               </button>
-              {mobileExpandedGroup === "circles" ? (
-                <div className="space-y-2 rounded-2xl border border-[#e8eef8] bg-[#f8fbff] p-2">
-                  <button
-                    type="button"
-                    onClick={() => handleNav("/halaqat/all")}
-                    className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-2.5 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#eef4ff]"
-                  >
-                    <span>جميع الحلقات</span>
-                  </button>
-                  {isCirclesLoading ? (
-                    <div className="px-4 py-2 text-sm font-medium text-[#6b778c]">جاري التحميل...</div>
-                  ) : (
-                    circles
-                      .map((circle) => (circle.name || "").trim())
-                      .filter((circleName) => circleName.length > 0)
-                      .map((circleName) => (
-                        <button
-                          key={`circles-${circleName}`}
-                          type="button"
-                          onClick={() => handleNav(`/halaqat/${encodeURIComponent(circleName)}`)}
-                          className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-2.5 text-right text-sm font-bold text-[#1a2332] transition-colors hover:bg-[#eef4ff]"
-                        >
-                          <span>{circleName}</span>
-                        </button>
-                      ))
-                  )}
-                </div>
-              ) : null}
               {(isTeacherAccount || isAdminAccount) ? (
                 <button
                   type="button"

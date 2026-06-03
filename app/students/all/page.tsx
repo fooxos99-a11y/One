@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { Header } from "@/components/header"
+import { LandingHeader } from "@/components/landing-header"
 import { Footer } from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
@@ -505,8 +505,8 @@ export default function AllStudentsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col bg-white">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
+        <LandingHeader />
+        <main className="flex-1 flex items-center justify-center pt-24">
           <div className="text-2xl text-[#20335f]">جاري التحميل...</div>
         </main>
         <Footer />
@@ -517,8 +517,8 @@ export default function AllStudentsPage() {
   if (allStudents.length === 0) {
     return (
       <div className="min-h-screen flex flex-col bg-white">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
+        <LandingHeader />
+        <main className="flex-1 flex items-center justify-center pt-24">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold text-[#1a2332] mb-4">جميع الطلاب</h1>
             <p className="text-xl text-gray-600">لا يوجد طلاب مسجلين حالياً</p>
@@ -531,9 +531,9 @@ export default function AllStudentsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {!isAutoScrolling && <Header />}
+      {!isAutoScrolling && <LandingHeader />}
 
-      <main className="flex-1 py-8 md:py-16">
+      <main className="flex-1 pt-24 py-8 md:pt-28 md:py-16">
         <div className="container mx-auto px-3 md:px-4">
           <div className="text-center mb-8 md:mb-16">
             <div className="flex items-center justify-center gap-2 md:gap-4 mb-4 md:mb-6">
