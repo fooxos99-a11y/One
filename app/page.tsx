@@ -1,6 +1,5 @@
 import dynamic from "next/dynamic"
 import { HeroSection } from "@/components/hero-section"
-import { AboutSection } from "@/components/about-section"
 import { LandingFooter } from "@/components/landing-footer"
 import { LandingHeader } from "@/components/landing-header"
 
@@ -14,7 +13,6 @@ export default function Home() {
       <main>
         <HeroSection />
         <div className="min-h-screen bg-transparent">
-          <AboutSection />
           <GoalsSection />
           <ContactSection />
         </div>

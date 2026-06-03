@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { LayoutDashboard, LogOut, Menu, User } from "lucide-react"
+import { Menu, User } from "lucide-react"
 import { LoginForm } from "@/components/login-form"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -276,10 +276,7 @@ export function LandingHeader() {
                   {isAdminAccount ? (
                     <>
                       <DropdownMenuItem onClick={() => handleNav("/admin/dashboard")} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-[#1a2332] focus:bg-[#f4f7ff] focus:text-[#3453a7]" dir="rtl">
-                        <span className="flex w-full items-center justify-between gap-3 text-right">
-                          <span>لوحة التحكم</span>
-                          <LayoutDashboard className="h-4 w-4" />
-                        </span>
+                        <span className="w-full text-right">لوحة التحكم</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
@@ -308,10 +305,7 @@ export function LandingHeader() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={handleLogout} className="cursor-pointer rounded-xl px-3 py-2.5 font-bold text-red-600 focus:bg-red-50 focus:text-red-600" dir="rtl">
-                    <span className="flex w-full items-center justify-between gap-3 text-right">
-                      <span>تسجيل الخروج</span>
-                      <LogOut className="h-4 w-4" />
-                    </span>
+                    <span className="w-full text-right">تسجيل الخروج</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
