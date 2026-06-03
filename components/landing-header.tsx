@@ -1,5 +1,9 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { User } from "lucide-react"
 
 const LANDING_LINKS = [
   { label: "الرئيسية", href: "#home" },
@@ -9,8 +13,39 @@ const LANDING_LINKS = [
 ] as const
 
 export function LandingHeader() {
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    let animationFrameId = 0
+
+    const syncScrollState = () => {
+      setIsScrolled(window.scrollY > 16)
+    }
+
+    const handleScroll = () => {
+      if (animationFrameId) {
+        return
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = 0
+        syncScrollState()
+      })
+    }
+
+    syncScrollState()
+    window.addEventListener("scroll", handleScroll, { passive: true })
+
+    return () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId)
+      }
+      window.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
+
   return (
-    <header className="site-header fixed inset-x-0 top-0 z-50">
+    <header data-scrolled={isScrolled ? "true" : "false"} className="site-header fixed inset-x-0 top-0 z-50">
       <div className="container mx-auto flex h-20 items-center justify-between gap-4 px-4">
         <Link href="/" className="site-header-brand relative z-20 inline-flex min-w-0 items-center gap-3" aria-label="العودة إلى الرئيسية">
           <Image
@@ -21,7 +56,7 @@ export function LandingHeader() {
             className="site-header-brand-logo h-9 w-9 object-contain"
             priority
           />
-          <div className="min-w-0 whitespace-nowrap text-right text-[0.92rem] font-black leading-tight text-white md:text-[#1a2332]">
+          <div className="min-w-0 whitespace-nowrap text-right text-[0.92rem] font-black leading-tight">
             مجمع الملك خالد
           </div>
         </Link>
@@ -48,9 +83,10 @@ export function LandingHeader() {
           </Link>
           <Link
             href="/login"
-            className="inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] px-5 text-sm font-black text-white shadow-[0_16px_40px_rgba(52,83,167,0.22)] transition-transform duration-200 hover:-translate-y-0.5"
+            className="site-header-user-button"
+            aria-label="تسجيل الدخول"
           >
-            تسجيل الدخول
+            <User size={20} />
           </Link>
         </div>
       </div>
